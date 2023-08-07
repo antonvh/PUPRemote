@@ -26,6 +26,7 @@ from machine import UART, Timer
 import math
 import struct
 
+debug=True
 # FIRST BYTE
 # bits 7-6
 MESSAGE_SYS = const(0x00)     # System message   0b00 << 6
@@ -164,32 +165,12 @@ default_modes = {
     },
 }
 
-class PUPDeviceEmulator():
-    """Emulate a PUP device over UART.
-    :param uart: UART object
-    :param modes: dict of modes to emulate
-    :param type_id: type ID of the device to emulate (default: 62, SPIKE Distance Sensor)
-    :param interval: interval in ms to send data (default: 50)
-    :return: PUPDeviceEmulator object
-    :rtype: PUPDeviceEmulator
-    :Example:
+class PUPDeviceEmulator:
 
-        .. code:: python
-
-        from pd_emu import PUPDeviceEmulator
-        from machine import UART
-        uart = UART(1, 115200)
-        pd = PUPDeviceEmulator(uart)
-        while 1:
-            for i in range(0, 100):
-                pd.write(0, i) # write value to mode 0
-            ret_val = pd.read(1) # read value from mode 1, set by remote hub.
-                
-    """
     def __init__(self, uart, modes=None, type_id=62, interval=50):
         self.uart = uart
         if modes is None:
-            modes = default_modes
+            self.modes = default_modes
         else:
             self.modes = modes
         self.type_id = type_id
@@ -198,12 +179,19 @@ class PUPDeviceEmulator():
         self.connected = False
         self.interval = interval
         self.heartbeat_fail = False
-        self.timer = Timer()
+        self.timer = Timer(1)
         self.advertise_device()
 
-    def __send(self, data):
-        self.uart.write(bytes(data))
-        self.uart.write(bytes((__calc_checksum(data),)))
+    def __send(self, data, calc_checksum=True):
+        if calc_checksum:
+            checksum=(__calc_checksum(data),)
+        else:
+            checksum=()
+        if debug:
+            print(hexlify(bytes(data+checksum)))
+        else:            
+            self.uart.write(bytes(data))
+            self.uart.write(bytes(checksum))
 
     def advertise_device(self):
         # ## UART Device Synchronization
@@ -237,15 +225,29 @@ class PUPDeviceEmulator():
         # `BYTE_ACK` is received, then it is assumed the feature is not supported and it
         # is expected that the information messages will be received at 2400 baud.
         answer = b'\x00'
-        while answer != BYTE_ACK:
+        if debug:
+            self.__send((BYTE_SYNC,),calc_checksum=False)
+            print("advertise_type()")
             self.advertise_type()
+            print("advertise_modes()")
             self.advertise_num_modes()
+            print("advertise_baud()")
             self.advertise_baud()
+            print("advertise_modes()")
             self.advertise_modes()
-            self.__send((BYTE_ACK, BYTE_SYNC))
-            answer = self.uart.read(1)
-        self.connected = True
-        self.advertise_data()
+            print("BYTE_ACK,BYTE_SYNC")
+            self.__send((BYTE_ACK,),calc_checksum=False)
+        else:                
+            while answer != BYTE_ACK:
+                elf.__send((BYTE_SYNC,),calc_checksum=False)
+                self.advertise_type()
+                self.advertise_num_modes()
+                self.advertise_baud()
+                self.advertise_modes()
+                self.__send((BYTE_ACK,),calc_checksum=False)
+                answer = self.uart.read(1)
+            self.connected = True
+            self.advertise_data()
 
     # ## Message Format
 
@@ -331,7 +333,7 @@ class PUPDeviceEmulator():
         #       |     6 modes
         #       MESSAGE_CMD | LENGTH_2 | CMD_MODES
         num_modes = len(self.modes)
-        num_views = sum(1 for m in self.modes if m['viewable'])
+        num_views = sum(1 for m in self.modes if self.modes[m]['viewable'])
         if num_modes <= 8:
             data = (
                 MESSAGE_CMD | LENGTH_2 | CMD_MODES, 
@@ -370,11 +372,11 @@ class PUPDeviceEmulator():
         #       |     speed = 115200
         #       MESSAGE_CMD | LENGTH_4 | CMD_SPEED
         data = (
-            MESSAGE_CMD | LENGTH_4 | CMD_SPEED, 
-            *struct.pack('i',baud), # Pack the length, then expand (*) into a list of bytes
-            )
+            MESSAGE_CMD | LENGTH_4 | CMD_SPEED,
+            )+ tuple(baud.to_bytes(4, 'little'))
+            
         self.__send(data)
-
+        
     
     
     def advertise_modes(self):
@@ -475,12 +477,14 @@ class PUPDeviceEmulator():
 
             # Basic mode info
             data = (
-                MESSAGE_INFO | LENGTH_16 | k-7 if k > 7 else k,
-                INFO_NAME | INFO_MODE_PLUS_8 if k > 7 else INFO_NAME,
-                *self.modes[k]['name'].encode('ascii')[:5], 0,
-                self.modes[k]['flags'], 0, 0, 0, 0, 0,
+                 MESSAGE_INFO | LENGTH_16 | (k-7 if k > 7 else k),
+                 INFO_NAME | INFO_MODE_PLUS_8 if k > 7 else INFO_NAME,
+                 )+tuple(self.modes[k]['name'].encode('ascii')[:5])+(
+                    0,
+                  self.modes[k]['flags'], 0, 0, 0, 0, 0,
                 0,0,0,0
             )
+
             self.__send(data)
 
             # Mode info
@@ -519,7 +523,7 @@ class PUPDeviceEmulator():
             #       |     INFO_FORMAT
             #       MESSAGE_INFO | LENGTH_4 | MODE_2, INFO_UNITS, <data-sets>, <format>, <figures>, <decimals>, <checksum>
             data = (
-                MESSAGE_INFO | LENGTH_4 | k-7 if k > 7 else k,
+                MESSAGE_INFO | LENGTH_4 | (k-7 if k > 7 else k),
                 INFO_FORMAT | INFO_MODE_PLUS_8 if k > 7 else INFO_FORMAT,
                 self.modes[k]['datasets'],
                 self.modes[k]['format'],
