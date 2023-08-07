@@ -132,34 +132,34 @@ class LPF2(object):
                          if cksm == 0xff ^ CMD_Select ^ mode:
                               self.current_mode = mode
                               print("change mode=",mode)
-                    elif chr == 0x46:     # sending over a string
-                         print("cmd recv")
-                         zero = self.readchar()
-                         b9 = self.readchar()
-                         ck = 0xff ^ zero ^ b9
-                         #print("zero=%02X,b9=%02x,ck=%02X"%(zero,b9,ck))
-                         if ((zero == 0) & (b9 == 0xb9)):   # intro bytes for the string
-                              ck=0xff # reset checksum for command
-                              char = self.readchar()    # size and mode
-                              size = 2**((char & 0b111000)>>3)
-                              #print("size=",size)
-                              mode = char & 0b111
-                              ck = ck ^ char
-                              #print("char=%02x,ck=%02x"%(char,ck))
-                              for i in range(len(self.textBuffer)):
-                                   self.textBuffer[i] = ord(b'\x00')
-                              for i in range(size):
-                                   self.textBuffer[i] = self.readchar()
-                                   ck = ck ^ self.textBuffer[i]
-                                   #print("textbuf=%02X,ck=%02X"%(self.textBuffer[i],ck))
-                              #print(self.textBuffer)
-                              #print("cmd=%02X"%char)
-                              cksm = self.readchar()
-                              #print("cksm=%02X, ck=%02X"%(cksm,ck))
-                              if cksm == ck:
-                                   if (char&CMD_Data == CMD_Data):
-                                       print("calling cb")
-                                       self.cmd_call_back(size,self.textBuffer)
+                    # elif chr == 0x46:     # sending over a string
+                    #      print("cmd recv")
+                    #      zero = self.readchar()
+                    #      b9 = self.readchar()
+                    #      ck = 0xff ^ zero ^ b9
+                    #      #print("zero=%02X,b9=%02x,ck=%02X"%(zero,b9,ck))
+                    #      if ((zero == 0) & (b9 == 0xb9)):   # intro bytes for the string
+                    #           ck=0xff # reset checksum for command
+                    #           char = self.readchar()    # size and mode
+                    #           size = 2**((char & 0b111000)>>3)
+                    #           #print("size=",size)
+                    #           mode = char & 0b111
+                    #           ck = ck ^ char
+                    #           #print("char=%02x,ck=%02x"%(char,ck))
+                    #           for i in range(len(self.textBuffer)):
+                    #                self.textBuffer[i] = ord(b'\x00')
+                    #           for i in range(size):
+                    #                self.textBuffer[i] = self.readchar()
+                    #                ck = ck ^ self.textBuffer[i]
+                    #                #print("textbuf=%02X,ck=%02X"%(self.textBuffer[i],ck))
+                    #           #print(self.textBuffer)
+                    #           #print("cmd=%02X"%char)
+                    #           cksm = self.readchar()
+                    #           #print("cksm=%02X, ck=%02X"%(cksm,ck))
+                    #           if cksm == ck:
+                    #                if (char&CMD_Data == CMD_Data):
+                    #                    print("calling cb")
+                    #                    self.cmd_call_back(size,self.textBuffer)
                     # elif chr<=0x7c and (chr & 0x44) == 0x44:     # write command?
                     #      l=(chr& 0b111000)>>3
                     #      print('write chr,l',chr,l)
