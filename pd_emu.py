@@ -23,10 +23,12 @@
 
 from micropython import const
 from machine import UART, Timer
+import utime
 import math
 import struct
-
-debug=True
+ 
+# debug=0: no debugging, debug=1 only printing, debug=2 printing and sending to uart
+debug=2
 # FIRST BYTE
 # bits 7-6
 MESSAGE_SYS = const(0x00)     # System message   0b00 << 6
@@ -187,11 +189,23 @@ class PUPDeviceEmulator:
             checksum=(__calc_checksum(data),)
         else:
             checksum=()
-        if debug:
+        if debug==1 or debug==2:
             print(hexlify(bytes(data+checksum)))
-        else:            
-            self.uart.write(bytes(data))
-            self.uart.write(bytes(checksum))
+        if debug==0 or debug==2:            
+            num_bytes=self.uart.write(bytes(data))
+            num_bytes=self.uart.write(bytes(checksum))
+
+
+    def __init_pup():
+        # TO DO: make this more generic
+        rx_pin=18
+        tx_pin=19
+        tx = machine.Pin(tx_pin, machine.Pin.OUT)
+        tx.value(1)
+        utime.sleep_ms(500)
+        # to do
+        # init UART to 2400 or 115200 whateever we choose
+
 
     def advertise_device(self):
         # ## UART Device Synchronization
@@ -224,8 +238,13 @@ class PUPDeviceEmulator:
         # device supports this feature, it will reply with a `BYTE_ACK` message. If no
         # `BYTE_ACK` is received, then it is assumed the feature is not supported and it
         # is expected that the information messages will be received at 2400 baud.
+        
+        resp=self.uart.read() # read all bytes that are in the uart buffer
         answer = b'\x00'
-        if debug:
+        
+        
+        if debug==1:
+            
             self.__send((BYTE_SYNC,),calc_checksum=False)
             print("advertise_type()")
             self.advertise_type()
@@ -239,13 +258,18 @@ class PUPDeviceEmulator:
             self.__send((BYTE_ACK,),calc_checksum=False)
         else:                
             while answer != BYTE_ACK:
-                elf.__send((BYTE_SYNC,),calc_checksum=False)
+                # add:
+                # pull tx pin high for 500ms
+                self.__send((BYTE_SYNC,),calc_checksum=False)
                 self.advertise_type()
                 self.advertise_num_modes()
+                # to do: change baudrate uart accordingly with new baudrate
                 self.advertise_baud()
                 self.advertise_modes()
                 self.__send((BYTE_ACK,),calc_checksum=False)
                 answer = self.uart.read(1)
+                print("answer",answer)
+            print("connected")
             self.connected = True
             self.advertise_data()
 
@@ -901,3 +925,5 @@ class PUPDeviceEmulator:
         #       |     |     combos[0] = 0x004f (modes 0, 1, 2, 3 and 6)
         #       |     INFO_MODE_COMBOS
         #       MESSAGE_INFO | LENGTH_2 | MODE_0
+        
+
