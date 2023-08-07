@@ -1,3 +1,5 @@
+#/bin/env micropython
+
 # # LEGO Powered Up UART Protocol Device Emulator
 
 
@@ -20,10 +22,16 @@
 # [3]: https://lego.github.io/lego-ble-wireless-protocol-docs/
 # [4]: https://github.com/pybricks/pybricks-micropython/blob/master/lib/lego/lego_uart.h
 
-
-from micropython import const
-from machine import UART, Timer
-import utime
+try:
+    from micropython import const
+except ImportError:
+    # micropython.const() is not available on normal Python
+    # but we can use a normal function instead
+    def const(x):
+        return x
+        
+# from machine import UART, Timer
+# import utime
 import math
 import struct
  
@@ -108,7 +116,7 @@ SPIKE_Color = const(61)
 SPIKE_Ultrasonic = const(62)
 Ev3_Utrasonic = const(34)
 
-def __calc_checksum(data):
+def _calc_checksum(data):
     # The checksum is computed by XORing `0xff` with each byte of the message.
     ck = 0xff
     for b in data:
@@ -186,7 +194,7 @@ class PUPDeviceEmulator:
 
     def __send(self, data, calc_checksum=True):
         if calc_checksum:
-            checksum=(__calc_checksum(data),)
+            checksum=(_calc_checksum(data),)
         else:
             checksum=()
         if debug==1 or debug==2:
@@ -664,7 +672,7 @@ class PUPDeviceEmulator:
                 mode_add = self.uart.read(1) # Ext mode
                 cs = self.uart.read(1) # checksum
                 # Check if the checksum is correct
-                if __calc_checksum((b,mode_add)) == cs:
+                if _calc_checksum((b,mode_add)) == cs:
                     # Good, now read the mode & data
                     b = self.uart.read(1) # Read the next byte
                     mode = __get_mode(b, mode_add)
@@ -672,7 +680,7 @@ class PUPDeviceEmulator:
                     payload = self.uart.read(length)
                     cs = self.uart.read(1) # checksum
                     # Check if the checksum is correct
-                    if __calc_checksum((b,payload)) == cs:
+                    if _calc_checksum((b,payload)) == cs:
                         self.modes[mode]['data'] = payload
 
             if (b & CMD_SELECT) == CMD_SELECT:
@@ -713,7 +721,7 @@ class PUPDeviceEmulator:
                 length = __get_length(b)
                 payload = self.uart.read(length)
                 cs = self.uart.read(1) # checksum
-                if __calc_checksum((b,payload)) == cs:
+                if _calc_checksum((b,payload)) == cs:
                     self.data_in = payload
 
             
