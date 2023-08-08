@@ -18,7 +18,7 @@ from utime import ticks_ms
 
 # Name, Format [# datasets, type, figures, decimals],
 # raw [min,max], Percent [min,max], SI [min,max], Symbol, functionMap [map in:data send type, map out: data rcv type], view in telemetry
-mode0 = ['LPF2-DETECT',[8,LPF2.DATA16,5,0],[0,1023],[0,100],[0,1023],'',[LPF2.ABSOLUTE,LPF2.ABSOLUTE],True]
+mode0 = ['LPF2-DETECT',[16,LPF2.DATA16,5,0],[0,1023],[0,100],[0,1023],'',[LPF2.ABSOLUTE,LPF2.ABSOLUTE],True]
 mode1 = ['LPF2-COUNT',[1,LPF2.DATA32,4,0],[0,100],[0,100],[0,100],'CNT',[LPF2.ABSOLUTE,0],True]
 mode2 = ['LPF2-CAL',[1,LPF2.DATAF,8,3],[0,1023],[0,100],[0,1023],'RAW',[LPF2.ABSOLUTE,LPF2.ABSOLUTE],False]
 modes2 = [mode0,mode1,mode2]
@@ -62,7 +62,8 @@ while True:
               mode=lpf2.current_mode
               print(mode)
               if mode==0:
-                  lpf2.send_payload('Int16',[value,value*2,value*3,value*4,value*5,value*6,value*7,value*8])
+                  lpf2.send_payload('Int16',[value,value*2,value*3,value*4,value*5,value*6,value*7,value*8,
+                                             value+1,value*2+1,value*3+1,value*4+1,value*5+1,value*6+1,value*7+1,value*8+1])
               elif mode==1:
                   lpf2.send_payload('Int32',(value+1000000000*value)&0x7fffffff)
               elif mode==2:

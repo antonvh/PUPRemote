@@ -104,7 +104,7 @@ class LPF2(object):
           if isinstance(array,list):
               
                bit = math.floor(log2(length[datatype]*len(array)))
-               bit = 4 if bit > 4 else bit     # max 16 bytes total (4 floats)
+               bit = 5 if bit > 5 else bit     # max 16 bytes total (4 floats)
                array = array[:math.floor((2**bit)/ length[datatype])]     # max array size is 16 bytes
                value = b''
                for element in array:
@@ -144,7 +144,7 @@ class LPF2(object):
                  payl=self.addChksm(payl)
                  self.writeIt(payl,debug=False)
                  self.writeIt(self.payload)
-                 print("n=",ticks_ms()-self.last_nack)
+                 #print("n=",ticks_ms()-self.last_nack)
                  self.last_nack=ticks_ms()
              else:
                if  b == CMD_Select:    # reset the mode
