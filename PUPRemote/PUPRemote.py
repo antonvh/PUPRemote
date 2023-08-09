@@ -12,10 +12,12 @@ class PUPRemote:
   def __init__(self):
     self.mode_list=[]
     self.command_mode_dict={}
+    self.mode_command=[]
     # {'gyro':{'f_P_h':'HHH','f_h_P','BB','mode':1},'rgb':{f_P_h':'HHH','mode':2}}
 
   
   def encode(self,format_string,*argv):
+    print("argv=",*argv)
     if argv:
         #try:
             f = format_string
@@ -57,8 +59,41 @@ class PUPRemote:
     default_mode=[command_name,[32,DATA8,3,0],[0,1023],[0,100],[0,1023],'RAW',[ABSOLUTE,ABSOLUTE],False]
     self.mode_list.append(default_mode)
     self.command_mode_dict[command_name]['mode']=len(self.mode_list) # add last added mode ad number.
+    self.mode_command.append(command_name)
 
   def add_command(self,command_name,format_pup_to_hub,*argv):
-    format_hub_to_pup=argv[0] if argv else ''
-    self.command_mode_dict[command_name]={'f_P_h':format_pup_to_hub,'f_h_P':format_hub_to_pup}
+    if argv:
+       format_hub_to_pup=argv[0]
+       call_back=argv[1]
+    else:
+      format_hub_to_pup=''
+      call_back=None
+    self.command_mode_dict[command_name]={'f_P_h':format_pup_to_hub,'f_h_P':format_hub_to_pup,'cb':call_back}
     self.add_mode(command_name)
+
+
+  def send(self,command_name,*argv):
+    format_pup_to_hub=self.command_mode_dict[command_name]['f_P_h']
+    print(format_pup_to_hub,*argv)
+    payl=encode(format_pup_to_hub,*argv)
+    print(payl)
+
+  def read(self,command_name,data): # data just vtemporaily added for testing
+    format_hub_to_pub=self.command_mode_dict[command_name]['f_h_P']
+    print(format_hub_to_pub,data)
+    payl=decode(data)
+    print(payl)
+
+  def call_back(self,mode,data):
+    command=mode+command[mode]
+    #############
+    # not finised
+    cb=if self.command_mode_dict[command]
+
+
+"""
+callback in LPF2:
+
+in heartbeat call call_back:
+   PUP_remote_call_back(mode,data)
+"""
