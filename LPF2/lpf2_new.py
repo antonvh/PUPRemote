@@ -231,7 +231,7 @@ class LPF2(object):
      def close(self):
           #self.uart.deinit()
           self.send_timer.deinit()
-          self.connected = False
+          
 
 # ---- settup definitions
 
