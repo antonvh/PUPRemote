@@ -54,9 +54,10 @@ def log2math(val):
   else:
        return 0
 
-def mode(name,size = 1, type=DATA8, format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,0], view = True):
+def mode(name,size = 1, type=DATA8, format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,ABSOLUTE], view = True):
           fig,dec = format.split('.')
-          fred = [name, [size,type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
+          #fred = [name, [size,type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
+          fred= [name,[size,LPF2.DATA8,5,0],[0,1023],[0,100],[0,1023],'',[LPF2.ABSOLUTE,LPF2.ABSOLUTE],True]
           return fred
 
 
@@ -82,6 +83,12 @@ class LPF2(object):
           self.textBuffer = bytearray(b'\x00'*32)
           self.cmd_call_back=default_cmd_callback
           self.last_nack= 0
+
+     @staticmethod
+     def mode(name,size = 1, type=DATA8, format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,0], view = True):
+          fig,dec = format.split('.')
+          fred = [name, [size,type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
+          return fred
 
      def write_tx_pin(self, value, sleep=500):
           tx = machine.Pin(self.tx_pin_nr, machine.Pin.OUT)
@@ -225,7 +232,7 @@ class LPF2(object):
      def close(self):
           #self.uart.deinit()
           self.send_timer.deinit()
-          self.connected = False
+          
 
 # ---- settup definitions
 
