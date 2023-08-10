@@ -70,7 +70,7 @@ class LPF2(object):
     #------ callback command
 
 
-     def __init__(self, modes=modes , type = WeDo_Ultrasonic, timer = 4, freq = 5):
+     def __init__(self, modes , type = WeDo_Ultrasonic, timer = 4, freq = 5):
           self.txTimer = timer
           self.modes = modes
           self.current_mode = 0
@@ -82,12 +82,6 @@ class LPF2(object):
           self.textBuffer = bytearray(b'\x00'*32)
           self.cmd_call_back=default_cmd_callback
           self.last_nack= 0
-
-     @staticmethod
-     def mode(name,size = 1, type=DATA8, format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,0], view = True):
-          fig,dec = format.split('.')
-          fred = [name, [size,type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
-          return fred
 
      def write_tx_pin(self, value, sleep=500):
           tx = machine.Pin(self.tx_pin_nr, machine.Pin.OUT)
@@ -231,7 +225,7 @@ class LPF2(object):
      def close(self):
           #self.uart.deinit()
           self.send_timer.deinit()
-          
+          self.connected = False
 
 # ---- settup definitions
 
