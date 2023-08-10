@@ -53,6 +53,7 @@ for i in range(20):
 ## To do
 - make one single library of the two classes with full documentation
 - power on M2
+- move payload as binary data between lpf2 and pupremote
   
 # LPF2
 This is the original code that we used for emulating a PUPdevice using a microcontroller (ESP32, OpenMV) running MicroPython.
