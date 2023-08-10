@@ -41,9 +41,10 @@ class PUPRemoteSensor:
         
         format_hub_to_pup=""
         cb=None
+        writable = 0
         if argv:
-            cb = argv[0]
-            format_hub_to_pup=argv[1]
+            format_hub_to_pup=argv[0]
+            writable = LPF2.ABSOLUTE
             
         if format_pup_to_hub == "repr" or format_hub_to_pup == "repr":
             size = 32
@@ -51,7 +52,7 @@ class PUPRemoteSensor:
             size_pup_to_hub=struct.calcsize(format_pup_to_hub)
             size_hub_to_pub=struct.calcsize(format_hub_to_pup)
             size=next_power_of_2(max(size_pup_to_hub,size_hub_to_pub))
-
+            cb = "set_" + mode_name
         self.commands.append( {
             'name': mode_name,
             'format_pup_to_hub': format_pup_to_hub,
@@ -60,8 +61,7 @@ class PUPRemoteSensor:
             'size':size
             }
             )
-        mode_temp=mode0 = [mode_name,[size,LPF2.DATA8,5,0],[0,1023],[0,100],[0,1023],'',[LPF2.ABSOLUTE,LPF2.ABSOLUTE],True]
-        self.lpup.modes.append( self.lpup.mode(mode_name, size) )
+        self.lpup.modes.append( self.lpup.mode(mode_name, size,LPF2.DATA8,writable) )
         # Reconnect as needed with new mode if we are already connected.
         #self.disconnect()
     

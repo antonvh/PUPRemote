@@ -36,8 +36,7 @@ class PUPRemoteHub:
         format_hub_to_pup=""
         cb=None
         if argv:
-            cb = argv[0]
-            format_hub_to_pup=argv[1]
+            format_hub_to_pup=argv[0]
             
             
         if format_pup_to_hub == "repr" or format_hub_to_pup == "repr":
@@ -107,7 +106,7 @@ class PUPRemoteHub:
 
 p=PUPRemoteHub(Port.A)
 p.add_command('rgb','BBB')
-p.add_command('gyro','HHH','set_gyro','BB')
+p.add_command('gyro','HHH','BB')
 print(p.read('gyro'))
 p.write('gyro',123,222)
 for i in range(20):

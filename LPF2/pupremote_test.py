@@ -21,7 +21,7 @@ def cb(size,buf):
 p=PUPRemoteSensor()
 # self, command: callable, mode_name: str, format_hub_to_pup: str,*argv):
 p.add_command('rgb','BBB')
-p.add_command('gyro','HHH','set_gyro','BB')
+p.add_command('gyro','HHH','BB')
 
 last_heartbeat = ticks_ms()
 last_send = ticks_ms()
