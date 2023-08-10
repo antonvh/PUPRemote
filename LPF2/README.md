@@ -54,6 +54,7 @@ for i in range(20):
 - make one single library of the two classes with full documentation
 - power on M2
 - move payload as binary data between lpf2 and pupremote
+- build in fail save: sensor not present, writing to non writable sensor, etc.
   
 # LPF2
 This is the original code that we used for emulating a PUPdevice using a microcontroller (ESP32, OpenMV) running MicroPython.
