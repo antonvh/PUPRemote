@@ -8,14 +8,14 @@ On the pup sensor we define a new sensor as follows:
 ```
 pup=PUPRemoteSensor()
 pup.add_command('rgb','BBB')
-pup.add_command('gyro','HHH','set_gyro','BB')
+pup.add_command('gyro','HHH','BB') # this mode supports a set function
 ```
 
 On the hub this is exactly similar:
 ```
 pup=PUPRemoteHub(Port.A)
 pup.add_command('rgb','BBB')
-pup.add_command('gyro','HHH','set_gyro','BB')
+pup.add_command('gyro','HHH','BB') # this mode supports a set function and is writable
 ```
 
 On the pup sensor the user has to define the functions following functions:
@@ -32,7 +32,7 @@ def gyro():
     y,p,r = read_gyro()
     return y,p,r
 
-def set_gyro(reg,val):
+def set_gyro(reg,val):  # this name should be 'set_<mode_name>'
    set_gyro_reg_val(reg,val)
 ```
 
@@ -51,8 +51,8 @@ for i in range(20):
 
 
 ## To do
-- the function name of the call back function is not needed if we predefine it as `set_<command_name>`. We can ommit the third parameter in `add_command`.
-- make one singel library of the teo classes with full documentation
+- make one single library of the two classes with full documentation
+- power on M2
   
 # LPF2
 This is the original code that we used for emulating a PUPdevice using a microcontroller (ESP32, OpenMV) running MicroPython.
@@ -61,7 +61,7 @@ This is the original code that we used for emulating a PUPdevice using a microco
 The Hub sends every 100ms a NACK_BYTE (0x02). It expects that the sensor send a [MESSAGE_CMD|LENGTH_1|CMD_EXT_MODE,EXT_CODE_m,CKHS] followed by the data of the sensor in its current mode. The EXT_CODE_m is ether 0x00 or 0x08 for extended modes>7. In the current LPF2 the extended modes are not yet supoorted, therefore, this message is always [0x46, 0x00, 0xc9].
 
 ## Old LPF2
-The old `LPF2.py` code uses a timer to send periodically the measurment data. Because the main program also send measurement data, things can get corrupted if the timer send and the user program send collide.
+The old `LPF2.py` code uses a timer to send periodically the measurement data. Because the main program also sends measurement data, things can get corrupted if the timer sends and the user program sends collide.
 
 ## New LPF2 Clean Heartbeat
 In`LPF2_new.py` a heartbeat method is used that takes care of detecting a NACK_BYTE and sending te response of the CMD_EXT_MODE and the last pyaload data. It should do that at least every HEARTBEAT_PERIOD, which is defined as 200ms.
