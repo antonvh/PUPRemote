@@ -114,3 +114,6 @@ p.add_command('gyro','HHH','set_gyro','BB')
 p.add_port(Port.A)
 print(p.read('gyro'))
 p.write('gyro',123,222)
+for i in range(20):
+    print(p.read('rgb'))
+    wait(100)

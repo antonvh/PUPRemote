@@ -19,7 +19,9 @@ def next_power_of_2(v):
   v+=1
   return v
   
-  
+def cb(size,buf):
+    print('cb')
+    print(size,buf)
 
 class PUPRemoteSensor:
  
@@ -28,7 +30,7 @@ class PUPRemoteSensor:
         self.commands = []
         self.mode_names = []
         self.lpup = LPF2.ESP_LPF2([])
-        self.lpup.set_call_back = self.call_back
+        self.lpup.set_call_back(self.call_back)
         
  
     
@@ -102,18 +104,20 @@ class PUPRemoteSensor:
         format_pup_to_hub=self.commands[mode]['format_pup_to_hub']
         result = eval(self.commands[mode]['name'])()
         size=self.commands[mode]['size']
-        print("format_pup_to_hub,*result",format_pup_to_hub,result)
+        #print("format_pup_to_hub,*result",format_pup_to_hub,result)
         payload = self.encode(size,format_pup_to_hub,*result)
         self.lpup.send_payload('Int8', list(payload))
         return self.connected
     
-    def call_back(self,mode,data):
+    def call_back(self,size,data):
         # data is received from hub
-        print("call_back",mode,data)
-        mode_name = self.mode_names[mode]
-        format = commands[mode]['format_hub_to_pup']
-        cb = eval(commands[mode]['cb'])
-        cb(*decode(format,data))
+      
+        mode=self.lpup.current_mode
+        mode_name = self.commands[mode]
+        format = self.commands[mode]['format_hub_to_pup']
+        #print("call_back",mode,mode_name,format,data)
+        cb = eval(self.commands[mode]['cb'])
+        cb(*self.decode(format,data))
         
         
         

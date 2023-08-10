@@ -85,7 +85,7 @@ class LPF2(object):
           self.last_nack= 0
 
      @staticmethod
-     def mode(name,size = 1, type=DATA8, format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,0], view = True):
+     def mode(name,size = 1, type=DATA8, format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,ABSOLUTE], view = True):
           fig,dec = format.split('.')
           fred = [name, [size,type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
           return fred
