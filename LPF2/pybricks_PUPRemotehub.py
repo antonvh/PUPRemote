@@ -23,10 +23,13 @@ def next_power_of_2(v):
   return v
 
 class PUPRemoteHub:
-    def __init__(self):
+    def __init__(self,port):
         self.commands = []
         self.mode_names = {}
-        self.pup_device=None
+        try:
+            self.pup_device=PUPDevice(port)
+        except:
+            print("PUPRemote device not ready on port",port)
 
     
     def add_command(self, mode_name: str, format_pup_to_hub: str,*argv):
@@ -57,12 +60,6 @@ class PUPRemoteHub:
         # Reconnect as needed with new mode if we are already connected.
         #self.disconnect()
     
-    def add_port(self,port):
-            try:
-                self.pup_device=PUPDevice(port)
-            except:
-                print("PUPdevice not ready on port",port)
-
     def decode(self, format, data):
         if format=='repr':
             return eval(data.replace(b'\x00',b'')) # strip zero's
@@ -108,10 +105,9 @@ class PUPRemoteHub:
         return result
 
 
-p=PUPRemoteHub()
+p=PUPRemoteHub(Port.A)
 p.add_command('rgb','BBB')
 p.add_command('gyro','HHH','set_gyro','BB')
-p.add_port(Port.A)
 print(p.read('gyro'))
 p.write('gyro',123,222)
 for i in range(20):
