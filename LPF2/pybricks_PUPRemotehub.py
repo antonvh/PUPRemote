@@ -1,13 +1,16 @@
-# This is a high level API for the LPF2 protocol. It is designed to be used with the 
-# ESP32 and the LEGO Hub, similar to uartremote.py.
+from pybricks.hubs import InventorHub
+from pybricks.pupdevices import Motor, ColorSensor, UltrasonicSensor
+from pybricks.parameters import Button, Color, Direction, Port, Side, Stop
+from pybricks.robotics import DriveBase
+from pybricks.tools import wait, StopWatch
+from pybricks.iodevices import PUPDevice
 
 
-import gc,utime
-import micropython
-import lpf2_new as LPF2
-from utime import ticks_ms
-import struct
+hub = InventorHub()
 
+    
+
+import ustruct as struct
 MAX_PKT=32
 
 
@@ -18,30 +21,21 @@ def next_power_of_2(v):
   v |= v >> 4
   v+=1
   return v
-  
-  
 
-class PUPRemoteSensor:
- 
+class PUPRemoteHub:
     def __init__(self):
-        self.connected = False
         self.commands = []
-        self.mode_names = []
-        self.lpup = LPF2.ESP_LPF2([])
-        self.lpup.set_call_back = self.call_back
-        
- 
+        self.mode_names = {}
+        self.pup_device=None
+
     
     def add_command(self, mode_name: str, format_pup_to_hub: str,*argv):
-        """
-        Add a command for remote calling. And set up the matching LPUP mode.
-        """
-        
         format_hub_to_pup=""
         cb=None
         if argv:
             cb = argv[0]
             format_hub_to_pup=argv[1]
+            
             
         if format_pup_to_hub == "repr" or format_hub_to_pup == "repr":
             size = 32
@@ -58,11 +52,17 @@ class PUPRemoteSensor:
             'size':size
             }
             )
-        mode_temp=mode0 = [mode_name,[size,LPF2.DATA8,5,0],[0,1023],[0,100],[0,1023],'',[LPF2.ABSOLUTE,LPF2.ABSOLUTE],True]
-        self.lpup.modes.append( self.lpup.mode(mode_name, size) )
+        self.mode_names[mode_name]=len(self.commands)-1
+        #self.lpup.modes.append( self.lpup.mode(mode_name, size) )
         # Reconnect as needed with new mode if we are already connected.
         #self.disconnect()
     
+    def add_port(self,port):
+            try:
+                self.pup_device=PUPDevice(port)
+            except:
+                print("PUPdevice not ready on port",port)
+
     def decode(self, format, data):
         if format=='repr':
             return eval(data.replace(b'\x00',b'')) # strip zero's
@@ -88,32 +88,29 @@ class PUPRemoteSensor:
         # this can be more efficient if lpf2.send_payload has byte array input
         return struct.unpack('%db'%size,payl)
     
-    def process(self):
-        # Call this function in your main loop, prefferably at least once every 20ms.
-        # It will handle the communication with the LEGO Hub, connect to it if needed,
-        # and call the registered commands.
-        #if not self.connected:
-        #    # Advertise once and check if the LEGO Hub is connects.
-        #    self.connected = self.lpup.initialize()
-        #else:
-        self.lpup.heartbeat()
-        mode=self.lpup.current_mode
-        # execute the command
-        format_pup_to_hub=self.commands[mode]['format_pup_to_hub']
-        result = eval(self.commands[mode]['name'])()
-        size=self.commands[mode]['size']
-        print("format_pup_to_hub,*result",format_pup_to_hub,result)
-        payload = self.encode(size,format_pup_to_hub,*result)
-        self.lpup.send_payload('Int8', list(payload))
-        return self.connected
     
-    def call_back(self,mode,data):
-        # data is received from hub
-        print("call_back",mode,data)
-        mode_name = self.mode_names[mode]
-        format = commands[mode]['format_hub_to_pup']
-        cb = eval(commands[mode]['cb'])
-        cb(*decode(format,data))
+    def write(self,mode_name,*argv):
+        mode = self.mode_names[mode_name]
+        format_hub_to_pup = self.commands[mode]['format_hub_to_pup']
+        size = self.commands[mode]['size']
+        payl = self.encode(size,format_hub_to_pup,*argv)
+        print(payl)
+        self.pup_device.write(mode,payl)
         
-        
-        
+  
+    def read(self,mode_name): # data just vtemporaily added for testing
+        mode = self.mode_names[mode_name]
+        format_pup_to_hub=self.commands[mode]['format_pup_to_hub']
+        data = self.pup_device.read(mode)
+        size=len(data)
+        raw_data=struct.pack('%db'%size,*data)
+        result = self.decode(format_pup_to_hub,raw_data)
+        return result
+
+
+p=PUPRemoteHub()
+p.add_command('rgb','BBB')
+p.add_command('gyro','HHH','set_gyro','BB')
+p.add_port(Port.A)
+print(p.read('gyro'))
+p.write('gyro',123,222)

@@ -70,7 +70,7 @@ class LPF2(object):
     #------ callback command
 
 
-     def __init__(self, modes , type = WeDo_Ultrasonic, timer = 4, freq = 5):
+     def __init__(self, modes=modes , type = WeDo_Ultrasonic, timer = 4, freq = 5):
           self.txTimer = timer
           self.modes = modes
           self.current_mode = 0
