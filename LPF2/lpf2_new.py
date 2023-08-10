@@ -54,10 +54,13 @@ def log2math(val):
   else:
        return 0
 
-def mode(name,size = 1, type=DATA8, format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,ABSOLUTE], view = True):
+def mode(name,size = 1, type=DATA8, writable=0,format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,ABSOLUTE], view = True):
           fig,dec = format.split('.')
-          #fred = [name, [size,type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
-          fred= [name,[size,LPF2.DATA8,5,0],[0,1023],[0,100],[0,1023],'',[LPF2.ABSOLUTE,LPF2.ABSOLUTE],True]
+          print("lpf2.mode ")
+          functionmap=[ABSOLUTE,writable]
+          fred = [name, [size,type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
+          #fred= [name,[size,LPF2.DATA8,5,0],[0,1023],[0,100],[0,1023],'',[LPF2.ABSOLUTE,writable],True]
+          print("mode=",fred)
           return fred
 
 
@@ -85,8 +88,9 @@ class LPF2(object):
           self.last_nack= 0
 
      @staticmethod
-     def mode(name,size = 1, type=DATA8, format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,ABSOLUTE], view = True):
+     def mode(name,size = 1, type=DATA8, writable=0,format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,ABSOLUTE], view = True):
           fig,dec = format.split('.')
+          functionmap=[ABSOLUTE,writable]
           fred = [name, [size,type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
           return fred
 
@@ -159,9 +163,9 @@ class LPF2(object):
                  cksm = self.readchar()
                  if cksm == 0xff ^ CMD_Select ^ mode:
                      self.current_mode = mode
-                     print("change mode=",mode)
+                     #print("change mode=",mode)
                elif b == 0x46:     # data from hub to sensor read 46 00 c9
-                    print("cmd recv")
+                    #print("cmd recv")
                     zero = self.readchar()
                     b9 = self.readchar()
                     ck = 0xff ^ zero ^ b9
@@ -174,6 +178,7 @@ class LPF2(object):
                          size = 2**((b & 0b111000)>>3)
                          #print("size=",size)
                          mode = b & 0b111
+                         self.current_mode = mode
                          ck = ck ^ b
                          #print("char=%02x,ck=%02x"%(char,ck))
                          self.textBuffer = bytearray(b'\x00'*size)
@@ -187,7 +192,7 @@ class LPF2(object):
                          #print("cksm=%02X, ck=%02X"%(cksm,ck))
                          if cksm == ck:
                               if (b & CMD_Data == CMD_Data):
-                                   print("calling cb")
+                                   #print("calling cb")
                                    self.cmd_call_back(size,self.textBuffer)
                                    
          
