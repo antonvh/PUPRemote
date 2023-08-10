@@ -74,8 +74,8 @@ class PUPRemoteSensor:
             if len(data)==1:
             # convert from tuple size 1 to single value
               data=data[0]
-        if all(d == 0 for d in data): # check for all zero's
-          data=None
+        #if all(d == 0 for d in data): # check for all zero's
+        #  data=None
         return data
 
     def encode(self,size,format,*argv):
