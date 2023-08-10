@@ -1,3 +1,60 @@
+# PUPRemote
+
+## Symmetric
+
+We define two classes: `PUPRemote` and `PUPRemoteHub`, running on the sensor and the hub, respectively.
+
+On the pup sensor we define a new sensor as follows:
+```
+pup=PUPRemoteSensor()
+# self, command: callable, mode_name: str, format_hub_to_pup: str,*argv):
+pup.add_command('rgb','BBB')
+pup.add_command('gyro','HHH','set_gyro','BB')
+```
+
+On the hub this is exactly similar:
+```
+pup=PUPRemoteHub(Port.A)
+pup.add_command('rgb','BBB')
+pup.add_command('gyro','HHH','set_gyro','BB')
+```
+
+On the pup sensor the user has to define the functions following functions:
+```
+def rgb():
+    # do reading of a color sensor
+    # return 3 bytes
+    r,g,b = read_color()
+    return r,g,b
+
+def gyro():
+    # do reading of a gyro sensor
+    # return 3 words
+    y,p,r = read_gyro()
+    return y,p,r
+
+def set_gyro(reg,val):
+   set_gyro_reg_val(reg,val)
+```
+
+On the hub we use the functions as follows:
+```
+pup.add_port(Port.A)
+print(pup.read('gyro'))
+pup.write('gyro',123,222)
+for i in range(20):
+    print(pup.read('rgb'))
+```
+
+## Limitations
+- only a single PUPRemote sensor is supported on a single port on the hub.
+- to keep the `add_command` method compatible between the pup sensor and the hub, we define the command function and the call back function as `str` instead of `callable`
+
+
+## To do
+- the function name of the call back function is not needed if we predefine it as `set_<command_name>`. We can ommit the third parameter in `add_command`.
+- make one singel library of the teo classes with full documentation
+  
 # LPF2
 This is the original code that we used for emulating a PUPdevice using a microcontroller (ESP32, OpenMV) running MicroPython.
 
