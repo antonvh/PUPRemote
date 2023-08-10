@@ -7,7 +7,6 @@ We define two classes: `PUPRemote` and `PUPRemoteHub`, running on the sensor and
 On the pup sensor we define a new sensor as follows:
 ```
 pup=PUPRemoteSensor()
-# self, command: callable, mode_name: str, format_hub_to_pup: str,*argv):
 pup.add_command('rgb','BBB')
 pup.add_command('gyro','HHH','set_gyro','BB')
 ```
