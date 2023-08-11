@@ -1,4 +1,4 @@
-#import PUPremote
+from pupremote import PUPRemoteSensor
 from utime import ticks_ms
 
 count = 0
