@@ -45,6 +45,17 @@ for i in range(20):
     print(pup.read('rgb'))
 ```
 
+## Compatibility
+
+Below the test result with different hub and os-es are shown:
+
+|HUB/OS | data from pup to hub | data from hub to pup | multiple modes? |
+|--------|---------------------|----------------------|-----------------|
+| PyBricks (technic, spike and mindstorms hub) | 32 byte data      | 32 bye data | up to 7 (current LPF2) |
+| Mindstorms Inventor Python| 
+| SPIKE 3 MicroPython | 8 values DATA16 | None | just mode 0 |
+
+
 ## Limitations
 - only a single PUPRemote sensor is supported on a single port on the hub.
 - to keep the `add_command` method compatible between the pup sensor and the hub, we define the command function and the call back function as `str` instead of `callable`
