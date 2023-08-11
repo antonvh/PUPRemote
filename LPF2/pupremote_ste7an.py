@@ -51,7 +51,7 @@ class PUPRemoteSensor:
         else:
             size_pup_to_hub=struct.calcsize(format_pup_to_hub)
             size_hub_to_pub=struct.calcsize(format_hub_to_pup)
-            size=next_power_of_2(max(size_pup_to_hub,size_hub_to_pub))
+            size=max(size_pup_to_hub,size_hub_to_pub)
             cb = "set_" + mode_name
         self.commands.append( {
             'name': mode_name,
