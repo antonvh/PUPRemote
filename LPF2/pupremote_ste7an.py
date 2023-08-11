@@ -25,11 +25,11 @@ def cb(size,buf):
 
 class PUPRemoteSensor:
  
-    def __init__(self):
+    def __init__(self, sensor_id=LPF2.Ev3_Utrasonic):
         self.connected = False
         self.commands = []
         self.mode_names = []
-        self.lpup = LPF2.ESP_LPF2([])
+        self.lpup = LPF2.ESP_LPF2([],sensor_id=sensor_id)
         self.lpup.set_call_back(self.call_back)
         
  

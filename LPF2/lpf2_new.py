@@ -35,7 +35,7 @@ format = {'Int8' : '<b', 'uInt8' : '<B', 'Int16' : '<h', 'uInt16' : '<H',
 
 HEARTBEAT_PERIOD=200 # time of inactivity after which we reset sensor
 
-# Name, Format [# datasets, type, figures, decimals],
+# Name, Format [# datasets, data_type, figures, decimals],
 # raw [min,max], Percent [min,max], SI [min,max], Symbol, functionMap [type, ?], view
 #mode0 = ['LPF2-DETECT',[1,DATA8,3,0],[0,10],[0,100],[0,10],'',[ABSOLUTE,0],True]
 #mode1 = ['LPF2-COUNT',[1,DATA32,4,0],[0,100],[0,100],[0,100],'CNT',[ABSOLUTE,0],True]
@@ -54,11 +54,11 @@ def log2math(val):
   else:
        return 0
 
-def mode(name,size = 1, type=DATA8, writable=0,format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,ABSOLUTE], view = True):
+def mode(name,size = 1, data_type=DATA8, writable=0,format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,ABSOLUTE], view = True):
           fig,dec = format.split('.')
           print("lpf2.mode ")
           functionmap=[ABSOLUTE,writable]
-          fred = [name, [size,type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
+          fred = [name, [size,data_type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
           #fred= [name,[size,LPF2.DATA8,5,0],[0,1023],[0,100],[0,1023],'',[LPF2.ABSOLUTE,writable],True]
           print("mode=",fred)
           return fred
@@ -74,11 +74,11 @@ class LPF2(object):
     #------ callback command
 
 
-     def __init__(self, modes , type = WeDo_Ultrasonic, timer = 4, freq = 5):
+     def __init__(self, modes , sensor_id = WeDo_Ultrasonic, timer = 4, freq = 5):
           self.txTimer = timer
           self.modes = modes
           self.current_mode = 0
-          self.type = type
+          self.sensor_id = sensor_id
           self.connected = False
           self.payload = bytearray([])
           self.freq = freq
@@ -88,10 +88,10 @@ class LPF2(object):
           self.last_nack= 0
 
      @staticmethod
-     def mode(name,size = 1, type=DATA8, writable=0,format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,ABSOLUTE], view = True):
+     def mode(name,size = 1, data_type=DATA8, writable=0,format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,ABSOLUTE], view = True):
           fig,dec = format.split('.')
           functionmap=[ABSOLUTE,writable]
-          fred = [name, [size,type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
+          fred = [name, [size,data_type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
           return fred
 
      def write_tx_pin(self, value, sleep=500):
@@ -111,24 +111,24 @@ class LPF2(object):
 
 # -------- Payload definition
 
-     def load_payload(self, datatype, array):   # note it must be a power of 2 length
+     def load_payload(self, data_type, array):   # note it must be a power of 2 length
           if isinstance(array,list):
               
-               bit = math.floor(log2(length[datatype]*len(array)))
+               bit = math.floor(log2(length[data_type]*len(array)))
                bit = 5 if bit > 5 else bit     # max 16 bytes total (4 floats)
-               array = array[:math.floor((2**bit)/ length[datatype])]     # max array size is 16 bytes
+               array = array[:math.floor((2**bit)/ length[data_type])]     # max array size is 16 bytes
                value = b''
                for element in array:
-                    value += struct.pack(format[datatype], element)
+                    value += struct.pack(format[data_type], element)
           else:
-               bit = int(log2(length[datatype]))
-               value = struct.pack(format[datatype], array)
+               bit = int(log2(length[data_type]))
+               value = struct.pack(format[data_type], array)
                #print("load_payload",bit,value)
           payload = bytearray([CMD_Data | (bit << CMD_LLL_SHIFT) | self.current_mode])+value
           self.payload = self.addChksm(payload)
 
-     def send_payload(self,datatype,array):
-         self.load_payload(datatype,array)
+     def send_payload(self,data_type,array):
+         self.load_payload(data_type,array)
          self.writeIt(self.payload,debug=False)
 
 #----- comm stuff
@@ -309,7 +309,7 @@ class LPF2(object):
           #self.send_timer = machine.Timer(-1)  # default is 200 ms
           #self.period=int(1000/self.freq)
           self.init()
-          self.writeIt(self.setType(self.type))  # set type to 35 (WeDo Ultrasonic) 61 (Spike color), 62 (Spike ultrasonic)
+          self.writeIt(self.setType(self.sensor_id))  # set sensor_id to 35 (WeDo Ultrasonic) 61 (Spike color), 62 (Spike ultrasonic)
           self.writeIt(self.defineModes(self.modes))  # tell how many modes
           self.writeIt(self.defineBaud(115200))
           self.writeIt(self.defineVers(2,2))
@@ -375,10 +375,10 @@ class EV3_LPF2(LPF2):
 class OpenMV_LPF2(LPF2):
      uartchannel = 3
 
-     def __init__(self, modes, type=WeDo_Ultrasonic, timer=4, freq=5):
+     def __init__(self, modes, sensor_id = WeDo_Ultrasonic, timer=4, freq=5):
           from uos import dupterm
           dupterm(None,2)
-          super().__init__(modes, type, timer, freq)
+          super().__init__(modes, sensor_id, timer, freq)
 
      def write_tx_pin(self, value, sleep=500):
           from pyb import Pin

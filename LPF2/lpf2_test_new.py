@@ -6,17 +6,17 @@ from utime import ticks_ms
 #micropython.alloc_emergency_exception_buf(200)
 
 #modes = [
-#LPF2.mode('int8',type = LPF2.DATA8),
-#LPF2.mode('int16', type = LPF2.DATA16),
-#LPF2.mode('int32', type = LPF2.DATA32),
-#LPF2.mode('float', format = '2.1', type = LPF2.DATAF),
-#LPF2.mode('int8_array',size = 4, type = LPF2.DATA8),
-#LPF2.mode('int16_array',size = 4, type = LPF2.DATA16),
-#LPF2.mode('int32_array',size = 4, type = LPF2.DATA32),
-#LPF2.mode('float_array',size = 4, format = '2.1', type = LPF2.DATAF)
+#LPF2.mode('int8',data_type = LPF2.DATA8),
+#LPF2.mode('int16', data_type = LPF2.DATA16),
+#LPF2.mode('int32', data_type = LPF2.DATA32),
+#LPF2.mode('float', format = '2.1', data_type = LPF2.DATAF),
+#LPF2.mode('int8_array',size = 4, data_type = LPF2.DATA8),
+#LPF2.mode('int16_array',size = 4, data_type = LPF2.DATA16),
+#LPF2.mode('int32_array',size = 4, data_type = LPF2.DATA32),
+#LPF2.mode('float_array',size = 4, format = '2.1', data_type = LPF2.DATAF)
 #]
 
-# Name, Format [# datasets, type, figures, decimals],
+# Name, Format [# datasets, data_type, figures, decimals],
 # raw [min,max], Percent [min,max], SI [min,max], Symbol, functionMap [map in:data send type, map out: data rcv type], view in telemetry
 mode0 = ['LPF2-DETECT',[32,LPF2.DATA8,5,0],[0,1023],[0,100],[0,1023],'',[LPF2.ABSOLUTE,LPF2.ABSOLUTE],True]
 mode1 = ['LPF2-COUNT',[2,LPF2.DATA16,5,0],[0,100],[0,100],[0,100],'CNT',[LPF2.ABSOLUTE,0],True]
@@ -26,7 +26,7 @@ modes2 = [mode0,mode1,mode2]
 #led = Pin(2, mode=Pin.OUT)
 #led.on()
 
-lpf2 = LPF2.ESP_LPF2(modes2, type=LPF2.SPIKE_Ultrasonic, timer = 1, freq = 20)    # ESP
+lpf2 = LPF2.ESP_LPF2(modes2, data_type=LPF2.SPIKE_Ultrasonic, timer = 1, freq = 20)    # ESP
 #lpf2 = LPF2.Prime_LPF2(1, 'Y1', 'Y2', modes, LPF2.SPIKE_Ultrasonic, timer = 4, freq = 5)    # PyBoard
 # use EV3_LPF2 or Prime_LPF2 - also make sure to select the port type on the EV3 to be ev3-uart
 

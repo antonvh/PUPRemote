@@ -18,7 +18,7 @@ def set_gyro(r,v):
 def cb(size,buf):
     print(size,buf)
     
-p=PUPRemoteSensor()
+p=PUPRemoteSensor(sensor_id=LPF2.SPIKE_Ultrasonic)
 # self, command: callable, mode_name: str, format_hub_to_pup: str,*argv):
 p.add_command('rgb','BBB')
 p.add_command('gyro','HHH','BB')
