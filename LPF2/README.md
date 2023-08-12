@@ -52,7 +52,7 @@ Below the test result with different hub and os-es are shown:
 |HUB/OS | data from pup to hub | data from hub to pup | multiple modes? |
 |--------|---------------------|----------------------|-----------------|
 | PyBricks (technic, spike and mindstorms hub) | 32 byte data      | 32 bye data | up to 7 (current LPF2) |
-| Mindstorms Inventor Python| 8 values of DATA8 | write_direct not working| up to 7 (current LPF2 |
+| Mindstorms Inventor Python| 8 values of DATA8 | write_direct not working | up to 7 (current LPF2 |
 | SPIKE 3 MicroPython | 8 values DATA16 | None | just mode 0 |
 
 
