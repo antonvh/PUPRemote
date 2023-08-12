@@ -4,9 +4,6 @@ from pybricks.parameters import Button, Color, Direction, Port, Side, Stop
 from pybricks.robotics import DriveBase
 from pybricks.tools import wait, StopWatch
 
-from pybricks.iodevices import PUPDevice
-
-
 hub = TechnicHub()
 
 from pupremote import *
