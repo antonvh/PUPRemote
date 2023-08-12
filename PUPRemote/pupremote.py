@@ -13,20 +13,18 @@ class PUPRemote:
         self.msg_size = 0
 
    
-    def add_command(self, mode_name: str, format_pup_to_hub: str,*argv):
-        format_hub_to_pup=""
+    def add_command(self, mode_name: str, format_pup_to_hub: str, *argv):
+        format_hub_to_pup = ""
         cb=None
         self.writable = 0
         if argv:
-            format_hub_to_pup=argv[0]
-
-            
+            format_hub_to_pup = argv[0]
         if format_pup_to_hub == "repr" or format_hub_to_pup == "repr":
             self.msg_size = 32
         else:
-            size_pup_to_hub=struct.calcsize(format_pup_to_hub)
-            size_hub_to_pub=struct.calcsize(format_hub_to_pup)
-            self.msg_size=max(size_pup_to_hub,size_hub_to_pub)
+            size_pup_to_hub = struct.calcsize(format_pup_to_hub)
+            size_hub_to_pub = struct.calcsize(format_hub_to_pup)
+            self.msg_size = max(size_pup_to_hub,size_hub_to_pub)
             cb = "set_" + mode_name
         self.commands.append( {
             'name': mode_name,
@@ -39,26 +37,24 @@ class PUPRemote:
         
     def decode(self, format, data):
         if format=='repr':
-            return eval(data.replace(b'\x00',b'')) # strip zero's
+            return eval(data.replace(b'\x00', b'')) # strip zero's
         else:
-            size=struct.calcsize(format)
-            data=struct.unpack(format,data[:size])
+            size = struct.calcsize(format)
+            data = struct.unpack(format, data[:size])
             if len(data)==1:
             # convert from tuple size 1 to single value
-              data=data[0]
-        #if all(d == 0 for d in data): # check for all zero's
-        #  data=None
+               data=data[0]
         return data
 
-    def encode(self,size,format,*argv):
+    def encode(self, size, format, *argv):
         if format=="repr":
             s=repr(*argv)
         else:
             s=struct.pack(format,*argv)
-        if len(s)>MAX_PKT or len(s)>size:
+        if len(s) > MAX_PKT or len(s) > size:
             print("payload exceeds maximum packet size")
         else:
-          payl = s+b'\x00'*(size-len(s))
+          payl = s + b'\x00' * (size-len(s))
         # this can be more efficient if lpf2.send_payload has byte array input
         return struct.unpack('%db'%size,payl)
     
@@ -97,7 +93,6 @@ class PUPRemoteSensor(PUPRemote):
     
     def call_back(self,size,data):
         # data is received from hub
-      
         mode=self.lpup.current_mode
         mode_name = self.commands[mode]
         format = self.commands[mode]['format_hub_to_pup']
@@ -110,15 +105,14 @@ class PUPRemoteHub(PUPRemote):
     def __init__(self, port):
         super().__init__()
         self.modes = {}
-        #try:
-        self.pup_device=PUPDevice(port)
-        #except:
-        #    print("PUPRemote device not ready on port",port)
+        try:
+            self.pup_device=PUPDevice(port)
+        except:
+            print("PUPRemote device not ready on port",port)
 
-    
-    def add_command(self, mode_name: str, format_pup_to_hub: str,*argv):
-        super().add_command( mode_name, format_pup_to_hub,*argv)
-        self.modes[mode_name]=len(self.commands)-1
+    def add_command(self, mode_name: str, format_pup_to_hub: str, *argv):
+        super().add_command( mode_name, format_pup_to_hub, *argv)
+        self.modes[mode_name] = len(self.commands)-1
     
     def write(self,mode_name,*argv):
         mode = self.modes[mode_name]
@@ -127,14 +121,13 @@ class PUPRemoteHub(PUPRemote):
         payl = self.encode(size,format_hub_to_pup,*argv)
         discard = self.pup_device.read(mode) # dummy read to set mode
         self.pup_device.write(mode,payl)
-        
   
     def read(self,mode_name): # data just vtemporaily added for testing
         mode = self.modes[mode_name]
-        format_pup_to_hub=self.commands[mode]['format_pup_to_hub']
+        format_pup_to_hub = self.commands[mode]['format_pup_to_hub']
         data = self.pup_device.read(mode)
         size=len(data)
-        raw_data=struct.pack('%db'%size,*data)
+        raw_data = struct.pack('%db'%size,*data)
         result = self.decode(format_pup_to_hub,raw_data)
         return result
 
