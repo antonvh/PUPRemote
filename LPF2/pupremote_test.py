@@ -1,6 +1,8 @@
 from pupremote import PUPRemoteSensor
 from utime import ticks_ms
 
+WeDo_Ultrasonic, SPIKE_Color, SPIKE_Ultrasonic = 35, 61, 62
+
 count = 0
 def rgb():
     global count
@@ -8,20 +10,24 @@ def rgb():
     count%=30
     return count,count*2,count*3
 
-def gyro():
-    return 1123,3221,2321
+def set_rgb(*argv):
+    print("set_rgb",argv)
 
-def set_gyro(r,v):
-    print('set_gyro',r,v)
+def gyroscoop():
+    resp = [i+1 for i in range(8)]
+    return resp
+
+def set_gyroscoop(*argv):
+    print('set_gyro',argv)
     
     
 def cb(size,buf):
     print(size,buf)
     
-p=PUPRemoteSensor(sensor_id=LPF2.SPIKE_Ultrasonic)
+p=PUPRemoteSensor(sensor_id=SPIKE_Ultrasonic)
 # self, command: callable, mode_name: str, format_hub_to_pup: str,*argv):
-p.add_command('rgb','BBB')
-p.add_command('gyro','HHH','BB')
+p.add_command('rgb','BBB','BBB')
+p.add_command('gyroscoop','8B','8B')
 
 last_heartbeat = ticks_ms()
 last_send = ticks_ms()

@@ -6,7 +6,9 @@ import math, struct
 from utime import ticks_ms
 import utime
 import binascii
- 
+
+MAX_PKT = 32
+
 BYTE_NACK = 0x02
 BYTE_ACK = 0x04
 CMD_Type = 0x40   # @, set sensor type command
@@ -29,9 +31,8 @@ ABSOLUTE,RELATIVE,DISCRETE = 16,8,4
 WeDo_Ultrasonic, SPIKE_Color, SPIKE_Ultrasonic = 35, 61, 62
 Ev3_Utrasonic = 34
 
-length = {'Int8' : 1, 'uInt8' : 1, 'Int16' : 2, 'uInt16' : 2, 'Int32' : 4, 'uInt32' : 4, 'float' : 4}
-format = {'Int8' : '<b', 'uInt8' : '<B', 'Int16' : '<h', 'uInt16' : '<H',
-     'Int32' : '<l', 'uInt32' : '<L', 'float' : '<f'}
+length = [1,2,4]
+format = ['B', 'H', 'I', 'f']
 
 HEARTBEAT_PERIOD=200 # time of inactivity after which we reset sensor
 
@@ -42,27 +43,12 @@ HEARTBEAT_PERIOD=200 # time of inactivity after which we reset sensor
 #mode2 = ['LPF2-CAL',[3,DATA16,3,0],[0,1023],[0,100],[0,1023],'RAW',[ABSOLUTE,0],False]
 #defaultModes = [mode0,mode1,mode2]
 
-def log2(x):
-    return math.log(x)/math.log(2)
-
-
-log2val={1:0,2:1,4:2,8:3,16:4,32:5}
-
-def log2math(val):
-  if val in log2val:
-       return log2val[val]
-  else:
-       return 0
-
-def mode(name,size = 1, data_type=DATA8, writable=0,format = '3.0',  raw = [0,100], percent = [0,100],  SI = [0,100], symbol = '', functionmap = [ABSOLUTE,ABSOLUTE], view = True):
-          fig,dec = format.split('.')
-          print("lpf2.mode ")
-          functionmap=[ABSOLUTE,writable]
-          fred = [name, [size,data_type,int(fig),int(dec)],raw,percent,SI,symbol,functionmap,view]
-          #fred= [name,[size,LPF2.DATA8,5,0],[0,1023],[0,100],[0,1023],'',[LPF2.ABSOLUTE,writable],True]
-          print("mode=",fred)
-          return fred
-
+def bit_length(x):
+    n=0
+    while (x>0):
+        x>>=1
+        n+=1
+    return n
 
 def default_cmd_callback(size,buf):
          print("received command")
@@ -71,8 +57,6 @@ def default_cmd_callback(size,buf):
          print("data=",binascii.hexlify(buf))
 
 class LPF2(object):
-    #------ callback command
-
 
      def __init__(self, modes , sensor_id = WeDo_Ultrasonic, timer = 4, freq = 5):
           self.txTimer = timer
@@ -111,21 +95,16 @@ class LPF2(object):
 
 # -------- Payload definition
 
-     def load_payload(self, data_type, array):   # note it must be a power of 2 length
-          if isinstance(array,list):
-              
-               bit = math.floor(log2(length[data_type]*len(array)))
-               bit = 5 if bit > 5 else bit     # max 16 bytes total (4 floats)
-               array = array[:math.floor((2**bit)/ length[data_type])]     # max array size is 16 bytes
-               value = b''
-               for element in array:
-                    value += struct.pack(format[data_type], element)
-          else:
-               bit = int(log2(length[data_type]))
-               value = struct.pack(format[data_type], array)
-               #print("load_payload",bit,value)
-          payload = bytearray([CMD_Data | (bit << CMD_LLL_SHIFT) | self.current_mode])+value
-          self.payload = self.addChksm(payload)
+     def load_payload(self,data_type, data):   
+         if isinstance(data,list):
+              bin_data=struct.pack('%d'%len(data)+format[data_type],*data)
+         else:
+             bin_data=bytes(data)
+         bin_data=bin_data[:MAX_PKT]
+         bit=bit_length(len(bin_data)-1)
+         bin_data=bin_data+b'\x00'*(2**bit-len(bin_data))
+         payload = bytearray([CMD_Data | (bit << CMD_LLL_SHIFT) | self.current_mode])+bin_data
+         self.payload = self.addChksm(payload)
 
      def send_payload(self,data_type,array):
          self.load_payload(data_type,array)
@@ -254,15 +233,12 @@ class LPF2(object):
           return self.addChksm(bytearray([CMD_Vers]) + hard + soft)
 
      def padString(self,string, num, startNum):
-          reply = bytearray([startNum])  # start with name
-          reply += string
-          exp = math.ceil(log2(len(string))) if len(string)>0 else 0  # find the next power of 2
-          size = 2**exp
+          reply = bytearray(string)
+          reply = reply[:MAX_PKT]
+          exp=bit_length(len(reply)-1)
+          reply = reply + b'\x00'*(2**exp - len(string))
           exp = exp<<3
-          length = size - len(string)
-          for i in range(length):
-               reply += bytearray([0])
-          return self.addChksm(bytearray([CMD_ModeInfo | exp | num]) + reply)
+          return self.addChksm(bytearray([CMD_ModeInfo | exp | num, startNum]) + reply)
 
      def buildFunctMap(self,mode, num, Type):
           exp = 1 << CMD_LLL_SHIFT
@@ -331,7 +307,7 @@ class LPF2(object):
 
                # Change baudrate
                self.fast_uart()
-               self.load_payload('uInt8',0)
+               self.load_payload(DATA8,0)
 
                #start callback  - MAKE SURE YOU RESTART THE CHIP EVERY TIME (CMD D) to kill previous callbacks running
                #self.send_timer.init(period=self.period, mode=machine.Timer.PERIODIC, callback= self.hubCallback)

@@ -1,24 +1,17 @@
 # This is a high level API for the LPF2 protocol. It is designed to be used with the 
 # ESP32 and the LEGO Hub, similar to uartremote.py.
-
+import lpf2_new as LPF2
 
 import gc,utime
 import micropython
-import lpf2_new as LPF2
+import lpf2 as LPF2
 from utime import ticks_ms
 import struct
 
 MAX_PKT=32
 
+DATA8,DATA16,DATA32,DATAF = 0,1,2,3
 
-def next_power_of_2(v):
-  v-=1
-  v |= v >> 1
-  v |= v >> 2
-  v |= v >> 4
-  v+=1
-  return v
-  
 def cb(size,buf):
     print('cb')
     print(size,buf)
@@ -106,7 +99,8 @@ class PUPRemoteSensor:
         size=self.commands[mode]['size']
         #print("format_pup_to_hub,*result",format_pup_to_hub,result)
         payload = self.encode(size,format_pup_to_hub,*result)
-        self.lpup.send_payload('Int8', list(payload))
+        #print("payload=",payload)
+        self.lpup.send_payload(DATA8, list(payload))
         return self.connected
     
     def call_back(self,size,data):
