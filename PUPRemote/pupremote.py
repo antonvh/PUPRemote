@@ -13,7 +13,7 @@ class PUPRemote:
         self.msg_size = 0
 
    
-    def add_command(self, mode_name: str, from_hub_fmt: str=None, to_hub_fmt: str =None):
+    def add_command(self, mode_name: str, to_hub_fmt: str ="", from_hub_fmt: str="" ):
         """Add a command to call on the remote sensor unit.
         :param mode_name: The name of the mode you defined on the sensor side.
         :type mode_name: str
@@ -21,15 +21,14 @@ class PUPRemote:
         to the hub. Use 'repr' to receive any python object. Or use a struct format string,
         to receive a fixed size payload. See https://docs.python.org/3/library/struct.html
         :type to_hub_fmt: str"""
-        from_hub_fmt = ""
         cb=None
         self.writable = 0
         if to_hub_fmt == "repr" or from_hub_fmt == "repr":
             self.msg_size = 32
         else:
-            size_pup_to_hub = struct.calcsize(to_hub_fmt)
-            size_hub_to_pub = struct.calcsize(from_hub_fmt)
-            self.msg_size = max(size_pup_to_hub,size_hub_to_pub)
+            size_to_hub_fmt = struct.calcsize(to_hub_fmt)
+            size_from_hub_fmt = struct.calcsize(from_hub_fmt)
+            self.msg_size = max(size_to_hub_fmt,size_from_hub_fmt )
             cb = "set_" + mode_name
         self.commands.append( {
             'name': mode_name,
@@ -75,10 +74,10 @@ class PUPRemoteSensor(PUPRemote):
         self.lpup = self.LPF2.ESP_LPF2([],sensor_id=sensor_id)
         self.lpup.set_call_back(self.call_back)
     
-    def add_command(self, mode_name: str, to_hub_fmt: str,*argv):
-        super().add_command(mode_name, to_hub_fmt,*argv)
+    def add_command(self, mode_name: str,  to_hub_fmt: str ="", from_hub_fmt: str="" ):
+        super().add_command(mode_name, to_hub_fmt = to_hub_fmt, from_hub_fmt = from_hub_fmt)
         writeable=0
-        if argv:
+        if from_hub_fmt != "":
             writeable = self.LPF2.ABSOLUTE
         self.lpup.modes.append( self.lpup.mode(mode_name, self.msg_size,self.LPF2.DATA8,writeable) )
 
@@ -115,8 +114,8 @@ class PUPRemoteHub(PUPRemote):
         except:
             print("PUPRemote device not ready on port",port)
 
-    def add_command(self, mode_name: str, to_hub_fmt: str, *argv):
-        super().add_command( mode_name, to_hub_fmt, *argv)
+    def add_command(self, mode_name: str, to_hub_fmt: str ="", from_hub_fmt: str=""):
+        super().add_command( mode_name,  to_hub_fmt = to_hub_fmt, from_hub_fmt = from_hub_fmt)
         self.modes[mode_name] = len(self.commands)-1
     
     def write(self,mode_name,*argv):
