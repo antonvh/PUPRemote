@@ -57,7 +57,6 @@ Below the test result with different hub and os-es are shown:
 
 
 ## Limitations
-- only a single PUPRemote sensor is supported on a single port on the hub.
 - to keep the `add_command` method compatible between the pup sensor and the hub, we define the command function and the call back function as `str` instead of `callable`
 
 
