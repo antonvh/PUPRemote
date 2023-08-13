@@ -14,6 +14,13 @@ class PUPRemote:
 
    
     def add_command(self, mode_name: str, format_pup_to_hub: str, *argv):
+        """Add a command to call on the remote sensor unit.
+        :param mode_name: The name of the mode you defined on the sensor side.
+        :type mode_name: str
+        :param format_pup_to_hub: The format string of the data sent from the sensor 
+        to the hub. Use 'repr' to receive any python object. Or use a struct format string,
+        to receive a fixed size payload. See https://docs.python.org/3/library/struct.html
+        :type format_pup_to_hub: str"""
         format_hub_to_pup = ""
         cb=None
         self.writable = 0
