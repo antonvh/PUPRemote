@@ -61,7 +61,7 @@ Below the test result with different hub and os-es are shown:
 
 
 ## To do
-- make one single library of the two classes with full documentation
+- [done] make one single library of the two classes with full documentation
 - power on M2
 - move payload as binary data between lpf2 and pupremote
 - build in fail save: sensor not present, writing to non writable sensor, etc.
