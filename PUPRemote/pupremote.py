@@ -13,31 +13,29 @@ class PUPRemote:
         self.msg_size = 0
 
    
-    def add_command(self, mode_name: str, format_pup_to_hub: str, *argv):
+    def add_command(self, mode_name: str, from_hub_fmt: str=None, to_hub_fmt: str =None):
         """Add a command to call on the remote sensor unit.
         :param mode_name: The name of the mode you defined on the sensor side.
         :type mode_name: str
-        :param format_pup_to_hub: The format string of the data sent from the sensor 
+        :param to_hub_fmt: The format string of the data sent from the sensor 
         to the hub. Use 'repr' to receive any python object. Or use a struct format string,
         to receive a fixed size payload. See https://docs.python.org/3/library/struct.html
-        :type format_pup_to_hub: str"""
-        format_hub_to_pup = ""
+        :type to_hub_fmt: str"""
+        from_hub_fmt = ""
         cb=None
         self.writable = 0
-        if argv:
-            format_hub_to_pup = argv[0]
-        if format_pup_to_hub == "repr" or format_hub_to_pup == "repr":
+        if to_hub_fmt == "repr" or from_hub_fmt == "repr":
             self.msg_size = 32
         else:
-            size_pup_to_hub = struct.calcsize(format_pup_to_hub)
-            size_hub_to_pub = struct.calcsize(format_hub_to_pup)
+            size_pup_to_hub = struct.calcsize(to_hub_fmt)
+            size_hub_to_pub = struct.calcsize(from_hub_fmt)
             self.msg_size = max(size_pup_to_hub,size_hub_to_pub)
             cb = "set_" + mode_name
         self.commands.append( {
             'name': mode_name,
-            'format_pup_to_hub': format_pup_to_hub,
+            'to_hub_fmt': to_hub_fmt,
             'cb':cb,
-            'format_hub_to_pup': format_hub_to_pup,
+            'from_hub_fmt': from_hub_fmt,
             'size':self.msg_size
             }
             )
@@ -77,8 +75,8 @@ class PUPRemoteSensor(PUPRemote):
         self.lpup = self.LPF2.ESP_LPF2([],sensor_id=sensor_id)
         self.lpup.set_call_back(self.call_back)
     
-    def add_command(self, mode_name: str, format_pup_to_hub: str,*argv):
-        super().add_command(mode_name, format_pup_to_hub,*argv)
+    def add_command(self, mode_name: str, to_hub_fmt: str,*argv):
+        super().add_command(mode_name, to_hub_fmt,*argv)
         writeable=0
         if argv:
             writeable = self.LPF2.ABSOLUTE
@@ -91,10 +89,10 @@ class PUPRemoteSensor(PUPRemote):
         self.lpup.heartbeat()
         mode=self.lpup.current_mode
         # execute the command
-        format_pup_to_hub=self.commands[mode]['format_pup_to_hub']
+        to_hub_fmt=self.commands[mode]['to_hub_fmt']
         result = eval(self.commands[mode]['name'])()
         size=self.commands[mode]['size']
-        payload = self.encode(size,format_pup_to_hub,*result)
+        payload = self.encode(size,to_hub_fmt,*result)
         self.lpup.send_payload(self.LPF2.DATA8, list(payload))
         return self.connected
     
@@ -102,7 +100,7 @@ class PUPRemoteSensor(PUPRemote):
         # data is received from hub
         mode=self.lpup.current_mode
         mode_name = self.commands[mode]
-        format = self.commands[mode]['format_hub_to_pup']
+        format = self.commands[mode]['from_hub_fmt']
         cb = eval(self.commands[mode]['cb'])
         cb(*self.decode(format,data))
         
@@ -117,24 +115,24 @@ class PUPRemoteHub(PUPRemote):
         except:
             print("PUPRemote device not ready on port",port)
 
-    def add_command(self, mode_name: str, format_pup_to_hub: str, *argv):
-        super().add_command( mode_name, format_pup_to_hub, *argv)
+    def add_command(self, mode_name: str, to_hub_fmt: str, *argv):
+        super().add_command( mode_name, to_hub_fmt, *argv)
         self.modes[mode_name] = len(self.commands)-1
     
     def write(self,mode_name,*argv):
         mode = self.modes[mode_name]
-        format_hub_to_pup = self.commands[mode]['format_hub_to_pup']
+        from_hub_fmt = self.commands[mode]['from_hub_fmt']
         size = self.commands[mode]['size']
-        payl = self.encode(size,format_hub_to_pup,*argv)
+        payl = self.encode(size,from_hub_fmt,*argv)
         discard = self.pup_device.read(mode) # dummy read to set mode
         self.pup_device.write(mode,payl)
   
     def read(self,mode_name): # data just vtemporaily added for testing
         mode = self.modes[mode_name]
-        format_pup_to_hub = self.commands[mode]['format_pup_to_hub']
+        to_hub_fmt = self.commands[mode]['to_hub_fmt']
         data = self.pup_device.read(mode)
         size=len(data)
         raw_data = struct.pack('%db'%size,*data)
-        result = self.decode(format_pup_to_hub,raw_data)
+        result = self.decode(to_hub_fmt,raw_data)
         return result
 
