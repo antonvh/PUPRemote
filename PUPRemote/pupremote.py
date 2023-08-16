@@ -11,8 +11,7 @@ class PUPRemote:
     def __init__(self):
         self.commands = []
         self.msg_size = 0
-
-   
+           
     def add_command(self, mode_name: str, to_hub_fmt: str ="", from_hub_fmt: str="" ):
         """Add a command to call on the remote sensor unit.
         :param mode_name: The name of the mode you defined on the sensor side.
@@ -67,9 +66,10 @@ class PUPRemoteSensor(PUPRemote):
         import lpf2 as LPF2
     except:
         pass
-    def __init__(self, sensor_id=1):
+    def __init__(self, sensor_id=1, power=False):
         super().__init__()
         self.connected = False
+        self.power = power
         self.mode_names = []
         self.lpup = self.LPF2.ESP_LPF2([],sensor_id=sensor_id)
         self.lpup.set_call_back(self.call_back)
@@ -79,6 +79,12 @@ class PUPRemoteSensor(PUPRemote):
         writeable=0
         if from_hub_fmt != "":
             writeable = self.LPF2.ABSOLUTE
+        max_mode_name_len = 5 if self.power else MAX_PKT
+        if len(mode_name) > max_mode_name_len:
+                print('Error: mode_name should not be longer than %d%s.' % (max_mode_name_len," if power=True" if self.power else ""))
+        else: # only enable power when len(mode_name)<=5
+            if self.power:
+                mode_name = mode_name.encode('ascii') + b'\x00'*(5-len(mode_name)) + b'\x00\x80\x00\x00\x00\x05\x04'
         self.lpup.modes.append( self.lpup.mode(mode_name, self.msg_size,self.LPF2.DATA8,writeable) )
 
     def process(self):
@@ -106,7 +112,7 @@ class PUPRemoteSensor(PUPRemote):
      
 
 class PUPRemoteHub(PUPRemote):
-    def __init__(self, port):
+    def __init__(self, port, power = False):
         super().__init__()
         self.modes = {}
         try:
