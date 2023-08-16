@@ -124,20 +124,23 @@ class PUPRemoteHub(PUPRemote):
         super().add_command( mode_name,  to_hub_fmt = to_hub_fmt, from_hub_fmt = from_hub_fmt)
         self.modes[mode_name] = len(self.commands)-1
     
-    def write(self,mode_name,*argv):
-        mode = self.modes[mode_name]
-        from_hub_fmt = self.commands[mode]['from_hub_fmt']
-        size = self.commands[mode]['size']
-        payl = self.encode(size,from_hub_fmt,*argv)
-        discard = self.pup_device.read(mode) # dummy read to set mode
-        self.pup_device.write(mode,payl)
-  
-    def read(self,mode_name): # data just vtemporaily added for testing
-        mode = self.modes[mode_name]
-        to_hub_fmt = self.commands[mode]['to_hub_fmt']
-        data = self.pup_device.read(mode)
-        size=len(data)
-        raw_data = struct.pack('%db'%size,*data)
-        result = self.decode(to_hub_fmt,raw_data)
-        return result
+    def call(self,mode_name, *argv):
+        if mode_name[:4] == 'set_':
+            mode_name = mode_name [4:]
+            mode = self.modes[mode_name]
+            from_hub_fmt = self.commands[mode]['from_hub_fmt']
+            size = self.commands[mode]['size']
+            payl = self.encode(size,from_hub_fmt,*argv)
+            discard = self.pup_device.read(mode) # dummy read to set mode
+            self.pup_device.write(mode,payl)
+        else:
+            mode = self.modes[mode_name]
+            to_hub_fmt = self.commands[mode]['to_hub_fmt']
+            data = self.pup_device.read(mode)
+            size=len(data)
+            raw_data = struct.pack('%db'%size,*data)
+            result = self.decode(to_hub_fmt,raw_data)
+            return result
+           
+
 
