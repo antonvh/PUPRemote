@@ -81,19 +81,24 @@ class PUPRemote:
         else:
             s=struct.pack(format,*argv)
 
-        # if len(s) > MAX_PKT or len(s) > size:
-        #     print("Payload exceeds maximum packet size")
-        # assert len(s) <= MAX_PKT, "Payload exceeds maximum packet size"
         assert len(s) <= size, "Payload exceeds maximum packet size"
-        # else:
-        #     # Pad with zeros
-        #     payl = s + b'\x00' * (size-len(s))
-        # # Convert payload to list of byte integers
-        # # This could be more efficient if lpf2.send_payload has byte array input
-        # return list(struct.unpack('%db'%size, payl))
+        
         return s
     
 class PUPRemoteSensor(PUPRemote):
+    """
+    Class to communicate with a PUPRemoteHub. Use this class on the sensor side,
+    on any board that runs MicroPython. You can enable 8V power on the M+ wire,
+    so the buck converter on the SPIKE-OPENMV or LMS-ESP32 board side can supply high
+    currents (op to 1700mA) to your appliances.
+
+    :param sensor_id: The id of the sensor of the sensor to emulate, defaults to 1.
+    :type sensor_id: int
+    :param power: Set to True if the PUPRemoteHub needs 8V power on M+ wire, defaults to False.
+    :type power: bool
+    :param platform: Set to ESP32 or OPENMV, defaults to ESP32.
+    :type platform: int
+    """
     try:
         import lpf2 as LPF2
     except:
@@ -131,18 +136,27 @@ class PUPRemoteSensor(PUPRemote):
             )
 
     def process(self):
-        # Call this function in your main loop, preferably at least once every 20ms.
-        # It will handle the communication with the LEGO Hub, connect to it if needed,
-        # and call the registered commands.
+        """
+        Process the commands. Call this function in your main loop, preferably at least once every 20ms.
+        It will handle the communication with the LEGO Hub, connect to it if needed,
+        and call the registered commands.
+        :return: True if connected to the hub, False otherwise.
+        """
+        # Get data from the hub
+        # TODO: make heartbeat return setter modes from hub
+        # so callbacks can be avoided.
         self.lpup.heartbeat()
+
+        # Return data to the hub, according to the current mode
         mode=self.lpup.current_mode
-        # execute the command
-        to_hub_fmt=self.commands[mode][TO_HUB_FORMAT]
         result = eval(self.commands[mode][NAME])()
-        size=self.commands[mode][SIZE] 
-        payload = self.encode(size, to_hub_fmt, *result)
-        self.lpup.send_payload(payload)
-        return self.connected
+        pl = self.encode(
+            self.commands[mode][SIZE], 
+            self.commands[mode][TO_HUB_FORMAT], 
+            *result
+            )
+        self.lpup.send_payload(pl)
+        return self.lpup.connected
     
     def call_back(self,size,data):
         # data is received from hub
@@ -157,9 +171,8 @@ class PUPRemoteSensor(PUPRemote):
 class PUPRemoteHub(PUPRemote):
     """
     Class to communicate with a PUPRemoteSensor. Use this class on the hub side,
-    on any hub that runs Pybricks. You can enable 8V power on the M+ wire,
-    so the buck converter on the SPIKE-OPENMV or LMS-ESP32 board side can supply high 
-    currents (op to 1700mA) to your appliances.
+    on any hub that runs Pybricks. Copy the commands you defined on the sensor side
+    to the hub side.
 
     :param port: The port to which the PUPRemoteSensor is connected.
     :type port: Port (Example: Port.A)
@@ -167,7 +180,7 @@ class PUPRemoteHub(PUPRemote):
     :type power: bool
     """
     
-    def __init__(self, port, power = False):
+    def __init__(self, port):
         try:
             from pybricks.iodevices import PUPDevice
         except:
@@ -181,15 +194,24 @@ class PUPRemoteHub(PUPRemote):
             self.pup_device=None
             print("PUPDevice not ready on port",port)
 
-    def call(self, mode_name, *argv):
+    def call(self, mode_name: str, *argv):
+        """
+        Call a remote function on the sensor side with the mode_name you defined on both sides.
+        :param mode_name: The name of the mode you defined on the sensor side.
+        :type mode_name: str
+        :param argv: As many arguments as you need to pass to the remote function.
+        :type argv: Any
+        """
         try:
+            # TODO: check for writable or from_hub_fmt instead of 'set_'
             if mode_name[:4] == 'set_':
                 mode_name = mode_name [4:]
                 mode = self.modes[mode_name]
                 from_hub_fmt = self.commands[mode][FROM_HUB_FORMAT]
                 size = self.commands[mode][SIZE] 
                 payl = self.encode(size,from_hub_fmt,*argv)
-                self.pup_device.read(mode) # dummy read to set mode
+                # Dummy read to set mode. TODO: this is a bug in lpf2.hearbeat()
+                self.pup_device.read(mode) 
                 self.pup_device.write(mode,payl)
             else:
                 mode = self.modes[mode_name]

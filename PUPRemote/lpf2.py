@@ -167,11 +167,13 @@ class LPF2(object):
 
     def heartbeat(self):
         if (ticks_ms() - self.last_nack) > HEARTBEAT_PERIOD:
+            # Reinitalize the port, have not heard from the hub in a while.
             self.last_nack = ticks_ms()
             self.initialize()
+
         b = self.readchar()  # read in any heartbeat bytes
         if b >= 0:  # keep reading next character
-            if b == 0:  # port has nto been setup yet
+            if b == 0:  # port has not been setup yet
                 pass
             elif b == BYTE_NACK:  # regular heartbeat pulse
                 # EXT_MODE_0 = 00
