@@ -34,7 +34,12 @@ TO_HUB_FORMAT      = const(2)
 FROM_HUB_FORMAT    = const(3)
 CALLBACK    = const(4)
 
-
+#: WeDo Ultrasonic sensor id
+WEDO_ULTRASONIC = const(35)
+#: SPIKE Color sensor id
+SPIKE_COLOR = const(61)
+#: SPIKE Ultrasonic sensor id
+SPIKE_ULTRASONIC = const(62)
 
 class PUPRemote:
     """
@@ -55,9 +60,14 @@ class PUPRemote:
         :param mode_name: The name of the mode you defined on the sensor side.
         :type mode_name: str
         :param to_hub_fmt: The format string of the data sent from the sensor
-        to the hub. Use 'repr' to receive any python object. Or use a struct format string,
-        to receive a fixed size payload. See https://docs.python.org/3/library/struct.html
-        :type to_hub_fmt: str"""
+            to the hub. Use 'repr' to receive any python object. Or use a struct format string,
+            to receive a fixed size payload. See https://docs.python.org/3/library/struct.html
+        
+        :type to_hub_fmt: str
+        :param from_hub_fmt: The format string of the data sent from the hub
+        :type from_hub_fmt: str
+        
+        """
         cb=None
         if to_hub_fmt == "repr" or from_hub_fmt == "repr":
             msg_size = 32
@@ -152,6 +162,7 @@ class PUPRemoteSensor(PUPRemote):
         Process the commands. Call this function in your main loop, preferably at least once every 20ms.
         It will handle the communication with the LEGO Hub, connect to it if needed,
         and call the registered commands.
+
         :return: True if connected to the hub, False otherwise.
         """
         # Get data from the hub
@@ -208,12 +219,14 @@ class PUPRemoteHub(PUPRemote):
     def call(self, mode_name: str, *argv, wait_ms=100):
         """
         Call a remote function on the sensor side with the mode_name you defined on both sides.
+        
         :param mode_name: The name of the mode you defined on the sensor side.
         :type mode_name: str
         :param argv: As many arguments as you need to pass to the remote function.
         :type argv: Any
         :param wait_ms: The time to wait for the sensor to respond after 
-        a write from the hub, defaults to 100ms.
+            a write from the hub, defaults to 100ms. This does not delay the read,
+            i.e. when you don't pass any arguments, the read will happen immediately.
         :type wait_ms: int
         """
     
