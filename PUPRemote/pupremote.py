@@ -27,20 +27,20 @@ class PUPRemote:
     Base class for PUPRemoteHub and PUPRemoteSensor. Defines a list of commands
     and their formats. Contains encoding/decoding functions.
     """
-    
+
     def __init__(self):
         # Store commands, their callbacks, size and format
         self.commands = []
         # Store mode names (commands) to look up their index
         self.modes = {}
-           
+
     def add_command(self, mode_name: str, to_hub_fmt: str ="", from_hub_fmt: str="" ):
-        """Define a remote call. Use this function with identical parameters on both 
+        """Define a remote call. Use this function with identical parameters on both
         the sensor and the hub.
 
         :param mode_name: The name of the mode you defined on the sensor side.
         :type mode_name: str
-        :param to_hub_fmt: The format string of the data sent from the sensor 
+        :param to_hub_fmt: The format string of the data sent from the sensor
         to the hub. Use 'repr' to receive any python object. Or use a struct format string,
         to receive a fixed size payload. See https://docs.python.org/3/library/struct.html
         :type to_hub_fmt: str"""
@@ -52,7 +52,7 @@ class PUPRemote:
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
             msg_size = max(size_to_hub_fmt,size_from_hub_fmt )
             cb = "set_" + mode_name
-        self.commands.append( 
+        self.commands.append(
                 {
                 NAME: mode_name,
                 TO_HUB_FORMAT: to_hub_fmt,
@@ -63,15 +63,15 @@ class PUPRemote:
             )
         # Build a dictionary of mode names and their index
         self.modes[mode_name] = len(self.commands)-1
-        
+
     def decode(self, format: str, data: bytes):
         if format=='repr':
-            return eval(data.replace(b'\x00', b'')) # strip zero's
+            return (eval(data.replace(b'\x00', b'')),) # strip zero's
         else:
             size = struct.calcsize(format)
             data = struct.unpack(format, data[:size])
             # Convert tuple size 1 to single value
-            if len(data)==1: data=data[0]
+            # if len(data)==1: data=data[0]
 
         return data
 
@@ -79,12 +79,12 @@ class PUPRemote:
         if format=="repr":
             s=repr(*argv)
         else:
-            s=struct.pack(format,*argv)
+            s=struct.pack(format, *argv)
 
         assert len(s) <= size, "Payload exceeds maximum packet size"
-        
+
         return s
-    
+
 class PUPRemoteSensor(PUPRemote):
     """
     Class to communicate with a PUPRemoteHub. Use this class on the sensor side,
@@ -114,7 +114,7 @@ class PUPRemoteSensor(PUPRemote):
         elif platform == OPENMV:
             self.lpup = self.LPF2.OpenMV_LPF2([],sensor_id=sensor_id)
         # self.lpup.set_call_back(self.call_back)
-    
+
     def add_command(self, mode_name: str,  to_hub_fmt: str ="", from_hub_fmt: str="" ):
         super().add_command(mode_name, to_hub_fmt = to_hub_fmt, from_hub_fmt = from_hub_fmt)
         writeable=0
@@ -126,13 +126,13 @@ class PUPRemoteSensor(PUPRemote):
         else: # only enable power when len(mode_name)<=5
             if self.power:
                 mode_name = mode_name.encode('ascii') + b'\x00'*(5-len(mode_name)) + b'\x00\x80\x00\x00\x00\x05\x04'
-        self.lpup.modes.append( 
+        self.lpup.modes.append(
             self.lpup.mode(
-                mode_name, 
+                mode_name,
                 self.commands[-1][SIZE], # This packet size of the last command we added (this one)
                 self.LPF2.DATA8,
                 writeable
-                ) 
+                )
             )
 
     def process(self):
@@ -149,33 +149,28 @@ class PUPRemoteSensor(PUPRemote):
 
         # Return data to the hub, according to the current mode
         mode = self.lpup.current_mode
-
+        result = None
         if data is not None:
             args = self.decode(
                 self.commands[mode][FROM_HUB_FORMAT],
                 data
                 )
             result = eval(self.commands[mode][NAME])(*args)
-        else:
+
+        if not self.commands[mode][FROM_HUB_FORMAT]:
             result = eval(self.commands[mode][NAME])()
 
-        pl = self.encode(
-            self.commands[mode][SIZE], 
-            self.commands[mode][TO_HUB_FORMAT], 
-            *result
-            )
-        self.lpup.send_payload(pl)
+        if result:
+            if not isinstance(result, tuple):
+                result = (result,)
+            pl = self.encode(
+                self.commands[mode][SIZE],
+                self.commands[mode][TO_HUB_FORMAT],
+                *result
+                )
+            self.lpup.send_payload(pl)
         return self.lpup.connected
-    
-    # def call_back(self,size,data):
-    #     # data is received from hub
-    #     mode=self.lpup.current_mode
-    #     mode_name = self.commands[mode]
-    #     format = self.commands[mode][FROM_HUB_FORMAT]
-    #     cb = eval(self.commands[mode][CALLBACK])
-    #     cb(*self.decode(format,data))
-        
-     
+
 
 class PUPRemoteHub(PUPRemote):
     """
@@ -188,14 +183,14 @@ class PUPRemoteHub(PUPRemote):
     :param power: Set to True if the PUPRemoteSensor needs 8V power on M+ wire.
     :type power: bool
     """
-    
+
     def __init__(self, port):
         try:
             from pybricks.iodevices import PUPDevice
         except:
             pass
         super().__init__()
-        
+
         self.port = port
         try:
             self.pup_device=PUPDevice(port)
@@ -217,10 +212,10 @@ class PUPRemoteHub(PUPRemote):
                 mode_name = mode_name [4:]
                 mode = self.modes[mode_name]
                 from_hub_fmt = self.commands[mode][FROM_HUB_FORMAT]
-                size = self.commands[mode][SIZE] 
+                size = self.commands[mode][SIZE]
                 payl = self.encode(size,from_hub_fmt,*argv)
                 # Dummy read to set mode. TODO: this is a bug in lpf2.hearbeat()
-                self.pup_device.read(mode) 
+                self.pup_device.read(mode)
                 self.pup_device.write(mode,payl)
             else:
                 mode = self.modes[mode_name]
@@ -232,6 +227,6 @@ class PUPRemoteHub(PUPRemote):
                 return result
         except OSError:
             print("PUPDevice not ready on port", self.port)
-           
+
 
 
