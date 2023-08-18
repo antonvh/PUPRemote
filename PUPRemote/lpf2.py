@@ -1,9 +1,7 @@
 # LPF2 class allows communication between LEGO SPIKE Prime and third party devices.
-# Based on code from Tufts University
 
 import machine
-import math, struct
-from utime import ticks_ms
+import struct
 import utime
 import binascii
 
@@ -166,9 +164,9 @@ class LPF2(object):
         return cbyte
 
     def heartbeat(self):
-        if (ticks_ms() - self.last_nack) > HEARTBEAT_PERIOD:
+        if (utime.ticks_ms() - self.last_nack) > HEARTBEAT_PERIOD:
             # Reinitalize the port, have not heard from the hub in a while.
-            self.last_nack = ticks_ms()
+            self.last_nack = utime.ticks_ms()
             self.initialize()
 
         b = self.readchar() # Read a byte as int.
@@ -179,26 +177,35 @@ class LPF2(object):
 
             elif b == BYTE_NACK:
                 # Regular heartbeat pulse from the hub. We have to reply with data.
-                self.last_nack = ticks_ms() # reset heartbeat timer
+                self.last_nack = utime.ticks_ms() # reset heartbeat timer
 
                 # Now send the payload
                 self.writeIt(self.payload)
-                
+                # print("payload", self.payload)
+
             elif b == CMD_Select:
+                self.last_nack = utime.ticks_ms() # reset heartbeat timer
                 # The hub is asking us to change mode.
                 mode = self.readchar()
                 cksm = self.readchar()
                 # Calculate the checksum for two bytes.
                 if cksm == 0xFF ^ CMD_Select ^ mode:
                     self.current_mode = mode
-                        
-            elif b == 0x46:  
+                    # TODO: make size calculation on mode creation
+                    size = self.modes[mode][1][0]
+                    dtype = self.modes[mode][1][1]
+                    bsize = size * 2 ** dtype
+                    if len(self.payload) != bsize+2:
+                        self.send_payload(bsize * [0])
+
+            elif b == 0x46:
+                self.last_nack = utime.ticks_ms() # reset heartbeat timer
                 # Data from hub to sensor should read 0x46, 0x00, 0xb9
                 # print("cmd recv")
                 ext_mode = self.readchar()  # 0x00 or 0x08
                 cksm = self.readchar()      # 0xb9
 
-                if cksm == 0xFF ^ 0x46 ^ ext_mode: 
+                if cksm == 0xFF ^ 0x46 ^ ext_mode:
                     b = self.readchar()  # CMD_Data | LENGTH | MODE
 
                     # Bitmask and then shift to get the size exponent of the data
@@ -209,16 +216,16 @@ class LPF2(object):
 
                     # Keep track of the checksum while reading data
                     ck = 0xFF ^ b
-                    
+
                     buf = bytearray(b"\x00" * size)
                     for i in range(size):
                         # TODO: keep readchar values in bytes instead of byte>int (ord)>byte
                         buf[i] = self.readchar()
                         # Keep track of the checksum
                         ck ^= buf[i]
-                        
-                    assert cksm == self.readchar(), "Checksum error"
-                    
+
+                    assert ck == self.readchar(), "Checksum error"
+
                     return buf
         return None
 
@@ -250,7 +257,6 @@ class LPF2(object):
         return chksm
 
     def addChksm(self, array):
-        
         return array + self.calc_cksm(array).to_bytes(1,'little')
 
     # -----  Init and close
@@ -362,8 +368,8 @@ class LPF2(object):
         self.writeIt(b"\x04")  # ACK
         # Check for ACK reply
         self.connected = self.waitFor(b"\x04")
-        print("Success" if self.connected else "Failed")
-        self.last_nack = ticks_ms()
+        print("Successfully connected to hub" if self.connected else "Failed to connect to hub")
+        self.last_nack = utime.ticks_ms()
 
         # Reset Serial to High Speed
         if self.connected:
