@@ -4,6 +4,20 @@ except ImportError:
     import struct
 
 try:
+    from pybricks.iodevices import PUPDevice
+    from pybricks.tools import wait
+except:
+    class PUPDevice:
+        def __init__(self, port):
+            pass
+        def read(self, mode):
+            pass
+        def write(self, mode, data):
+            pass
+    def wait(ms):
+        pass
+
+try:
     from micropython import const
 except ImportError:
     # micropython.const() is not available on normal Python
@@ -185,12 +199,7 @@ class PUPRemoteHub(PUPRemote):
     """
 
     def __init__(self, port):
-        try:
-            from pybricks.iodevices import PUPDevice
-        except:
-            pass
         super().__init__()
-
         self.port = port
         try:
             self.pup_device=PUPDevice(port)
@@ -198,35 +207,38 @@ class PUPRemoteHub(PUPRemote):
             self.pup_device=None
             print("PUPDevice not ready on port",port)
 
-    def call(self, mode_name: str, *argv):
+    def call(self, mode_name: str, *argv, wait_ms=100):
         """
         Call a remote function on the sensor side with the mode_name you defined on both sides.
         :param mode_name: The name of the mode you defined on the sensor side.
         :type mode_name: str
         :param argv: As many arguments as you need to pass to the remote function.
         :type argv: Any
+        :param wait_ms: The time to wait for the sensor to respond after 
+        a write from the hub, defaults to 100ms.
+        :type wait_ms: int
         """
-        try:
-            # TODO: check for writable or from_hub_fmt instead of 'set_'
-            if mode_name[:4] == 'set_':
-                mode_name = mode_name [4:]
-                mode = self.modes[mode_name]
-                from_hub_fmt = self.commands[mode][FROM_HUB_FORMAT]
-                size = self.commands[mode][SIZE]
-                payl = self.encode(size,from_hub_fmt,*argv)
-                # Dummy read to set mode. TODO: this is a bug in lpf2.hearbeat()
-                self.pup_device.read(mode)
-                self.pup_device.write(mode,payl)
-            else:
-                mode = self.modes[mode_name]
-                to_hub_fmt = self.commands[mode][TO_HUB_FORMAT]
-                data = self.pup_device.read(mode)
-                size=len(data)
-                raw_data = struct.pack('%db'%size,*data)
-                result = self.decode(to_hub_fmt,raw_data)
-                return result
-        except OSError:
-            print("PUPDevice not ready on port", self.port)
+    
+        mode = self.modes[mode_name]
+        size = self.commands[mode][SIZE] 
 
+        if len(argv) > 0:
+            payl = self.encode(
+                size,
+                self.commands[mode][FROM_HUB_FORMAT],
+                *argv
+                )
+            self.pup_device.write(
+                mode, 
+                tuple(payl + b'\x00'*( size - len(payl)))
+                )
+            wait(wait_ms)
 
-
+        data = self.pup_device.read(mode)
+        size=len(data)
+        raw_data = struct.pack('%db'%size,*data)
+        result = self.decode(
+            self.commands[mode][TO_HUB_FORMAT],
+            raw_data)
+        return result
+    
