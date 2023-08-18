@@ -44,7 +44,8 @@ HEARTBEAT_PERIOD = 200  # time of inactivity after which we reset sensor
 # defaultModes = [mode0,mode1,mode2]
 
 
-def bit_length(x):
+def __num_bits(x):
+    # Return the number of bits required to represent x
     n = 0
     while x > 0:
         x >>= 1
@@ -122,22 +123,37 @@ class LPF2(object):
 
     # -------- Payload definition
 
-    def load_payload(self, data_type, data):
+    def load_payload(self, data, data_type = DATA8):
         if isinstance(data, list):
+            # We have a list of integers. Pack them as bytes.
             bin_data = struct.pack("%d" % len(data) + format[data_type], *data)
+        elif isinstance(data, str):
+            # String. Convert to bytes.
+            bin_data = bytes(data, "UTF-8")[:MAX_PKT]
+        elif isinstance(data, bytes):
+            bin_data = data
+        elif isinstance(data, bytearray):
+            bin_data = data
         else:
-            bin_data = bytes(data)
-        bin_data = bin_data[:MAX_PKT]
-        bit = bit_length(len(bin_data) - 1)
-        bin_data = bin_data + b"\x00" * (2**bit - len(bin_data))
+            raise ValueError("Wrong data type: %s" % type(data))
+
+        assert len(bin_data) <= MAX_PKT, "Payload exceeds maximum packet size"
+
+        # Find the power of 2 that is greater than the length of the data
+        # -1 because of the header byte
+        bit = __num_bits( len(bin_data)-1 )
+
         payload = (
-            bytearray([CMD_Data | (bit << CMD_LLL_SHIFT) | self.current_mode])
+            # Header byte
+            (CMD_Data | (bit << CMD_LLL_SHIFT) | self.current_mode).to_bytes(1,'little')
             + bin_data
+            # Pad zero to the next power of 2
+            + b"\x00" * (2**bit - len(bin_data))
         )
         self.payload = self.addChksm(payload)
 
-    def send_payload(self, data_type, array):
-        self.load_payload(data_type, array)
+    def send_payload(self, array, data_type = DATA8):
+        self.load_payload(array, data_type)
         self.writeIt(self.payload, debug=False)
 
     # ----- comm stuff
@@ -229,8 +245,8 @@ class LPF2(object):
         for b in array:
             chksm ^= b
         chksm ^= 0xFF
-        array.append(chksm)
-        return array
+        # array.append(chksm)
+        return array + chksm.to_bytes(1,'little')
 
     # -----  Init and close
 
@@ -261,7 +277,7 @@ class LPF2(object):
     def padString(self, string, num, startNum):
         reply = bytearray(string, "UTF-8")
         reply = reply[:MAX_PKT]
-        exp = bit_length(len(reply) - 1)
+        exp = __num_bits(len(reply) - 1)
         reply = reply + b"\x00" * (2**exp - len(string))
         exp = exp << 3
         return self.addChksm(bytearray([CMD_ModeInfo | exp | num, startNum]) + reply)
@@ -350,7 +366,7 @@ class LPF2(object):
 
             # Change baudrate
             self.fast_uart()
-            self.load_payload(DATA8, 0)
+            self.load_payload(b'\x00')
 
             # start callback  - MAKE SURE YOU RESTART THE CHIP EVERY TIME (CMD D) to kill previous callbacks running
             # self.send_timer.init(period=self.period, mode=machine.Timer.PERIODIC, callback= self.hubCallback)
