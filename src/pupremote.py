@@ -72,7 +72,6 @@ class PUPRemote:
         :type from_hub_fmt: str
         
         """
-        cb=None
         if to_hub_fmt == "repr" or from_hub_fmt == "repr":
             msg_size = 32
         else:
