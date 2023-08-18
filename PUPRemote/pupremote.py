@@ -31,6 +31,7 @@ class PUPRemote:
     def __init__(self):
         # Store commands, their callbacks, size and format
         self.commands = []
+        # Store mode names (commands) to look up their index
         self.modes = {}
            
     def add_command(self, mode_name: str, to_hub_fmt: str ="", from_hub_fmt: str="" ):
@@ -44,7 +45,6 @@ class PUPRemote:
         to receive a fixed size payload. See https://docs.python.org/3/library/struct.html
         :type to_hub_fmt: str"""
         cb=None
-        self.writable = 0
         if to_hub_fmt == "repr" or from_hub_fmt == "repr":
             msg_size = 32
         else:
@@ -64,15 +64,15 @@ class PUPRemote:
         # Build a dictionary of mode names and their index
         self.modes[mode_name] = len(self.commands)-1
         
-    def decode(self, format, data):
+    def decode(self, format: str, data: bytes):
         if format=='repr':
             return eval(data.replace(b'\x00', b'')) # strip zero's
         else:
             size = struct.calcsize(format)
             data = struct.unpack(format, data[:size])
-            if len(data)==1:
-            # convert from tuple size 1 to single value
-               data=data[0]
+            # Convert tuple size 1 to single value
+            if len(data)==1: data=data[0]
+
         return data
 
     def encode(self, size, format, *argv):
@@ -80,12 +80,18 @@ class PUPRemote:
             s=repr(*argv)
         else:
             s=struct.pack(format,*argv)
-        if len(s) > MAX_PKT or len(s) > size:
-            print("Payload exceeds maximum packet size")
-        else:
-          payl = s + b'\x00' * (size-len(s))
-        # this can be more efficient if lpf2.send_payload has byte array input
-        return struct.unpack('%db'%size,payl)
+
+        # if len(s) > MAX_PKT or len(s) > size:
+        #     print("Payload exceeds maximum packet size")
+        # assert len(s) <= MAX_PKT, "Payload exceeds maximum packet size"
+        assert len(s) <= size, "Payload exceeds maximum packet size"
+        # else:
+        #     # Pad with zeros
+        #     payl = s + b'\x00' * (size-len(s))
+        # # Convert payload to list of byte integers
+        # # This could be more efficient if lpf2.send_payload has byte array input
+        # return list(struct.unpack('%db'%size, payl))
+        return s
     
 class PUPRemoteSensor(PUPRemote):
     try:
@@ -115,10 +121,17 @@ class PUPRemoteSensor(PUPRemote):
         else: # only enable power when len(mode_name)<=5
             if self.power:
                 mode_name = mode_name.encode('ascii') + b'\x00'*(5-len(mode_name)) + b'\x00\x80\x00\x00\x00\x05\x04'
-        self.lpup.modes.append( self.lpup.mode(mode_name, self.commands[mode_name][SIZE] , self.LPF2.DATA8,writeable) )
+        self.lpup.modes.append( 
+            self.lpup.mode(
+                mode_name, 
+                self.commands[-1][SIZE], # This packet size of the last command we added (this one)
+                self.LPF2.DATA8,
+                writeable
+                ) 
+            )
 
     def process(self):
-        # Call this function in your main loop, prefferably at least once every 20ms.
+        # Call this function in your main loop, preferably at least once every 20ms.
         # It will handle the communication with the LEGO Hub, connect to it if needed,
         # and call the registered commands.
         self.lpup.heartbeat()
@@ -127,8 +140,8 @@ class PUPRemoteSensor(PUPRemote):
         to_hub_fmt=self.commands[mode][TO_HUB_FORMAT]
         result = eval(self.commands[mode][NAME])()
         size=self.commands[mode][SIZE] 
-        payload = self.encode(size,to_hub_fmt,*result)
-        self.lpup.send_payload(self.LPF2.DATA8, list(payload))
+        payload = self.encode(size, to_hub_fmt, *result)
+        self.lpup.send_payload(payload)
         return self.connected
     
     def call_back(self,size,data):
