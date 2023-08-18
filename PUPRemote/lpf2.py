@@ -181,12 +181,6 @@ class LPF2(object):
                 # Regular heartbeat pulse from the hub. We have to reply with data.
                 self.last_nack = ticks_ms() # reset heartbeat timer
 
-                # Precede the payload with a sensor type command.
-                # Shouldn't this only apply to mode advertisements on initialize?
-                payl = bytearray([CMD_Type | LENGTH_1 | CMD_EXT_MODE, self.sensor_id])
-                payl = self.addChksm(payl)
-                self.writeIt(payl, debug=False)
-
                 # Now send the payload
                 self.writeIt(self.payload)
                 
