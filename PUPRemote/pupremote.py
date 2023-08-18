@@ -84,8 +84,6 @@ class PUPRemote:
         else:
             size = struct.calcsize(format)
             data = struct.unpack(format, data[:size])
-            # Convert tuple size 1 to single value
-            # if len(data)==1: data=data[0]
 
         return data
 
@@ -240,5 +238,9 @@ class PUPRemoteHub(PUPRemote):
         result = self.decode(
             self.commands[mode][TO_HUB_FORMAT],
             raw_data)
-        return result
+        # Convert tuple size 1 to single value
+        if len(result)==1: 
+            return result[0]
+        else:
+            return result
     
