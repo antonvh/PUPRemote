@@ -1,3 +1,8 @@
+# Copy the contents of this file to a new Pybricks project on the hub side.
+# Copy the contents of pupremote.py to a new Pybricks project with EXACTLY the name pupremote.py
+
+# Connect the LMS-ESP32 to port A of the hub.
+
 from pybricks.hubs import InventorHub
 from pybricks.pupdevices import Motor, ColorSensor, UltrasonicSensor
 from pybricks.parameters import Button, Color, Direction, Port, Side, Stop
@@ -6,7 +11,7 @@ from pybricks.tools import wait, StopWatch
 
 hub = InventorHub()
 
-from pupremote import *
+from pupremote import PUPRemoteHub
 
 p=PUPRemoteHub(Port.A)
 p.add_command('rgb','BBB','BBB')

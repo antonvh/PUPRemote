@@ -1,3 +1,7 @@
+# Copy the contents of this file to main.py on the ESP32 side.
+# Copy pupremote.py and lpf2.py to the ESP32 side.
+# Use Thonny or Pymakr
+
 from pupremote import PUPRemoteSensor
 from utime import ticks_ms
 
@@ -20,24 +24,10 @@ def gyroscoop():
 def set_gyroscoop(*argv):
     print('set_gyro',argv)
     
-    
-def cb(size,buf):
-    print(size,buf)
-    
 p=PUPRemoteSensor(sensor_id=SPIKE_Ultrasonic)
-# self, command: callable, mode_name: str, format_hub_to_pup: str,*argv):
+
 p.add_command('rgb','BBB','BBB')
 p.add_command('gyroscoop','8B','8B')
 
-last_heartbeat = ticks_ms()
-last_send = ticks_ms()
-# Loop
 while True:
-    if (ticks_ms() - last_heartbeat > 20):
-        last_heartbeat = ticks_ms()
-        state=p.process()
-        #if not lpf2.connected:
-        #      utime.sleep_ms(200)
-                  
-        #else:
-
+    connected=p.process()
