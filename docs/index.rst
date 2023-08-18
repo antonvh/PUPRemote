@@ -14,7 +14,7 @@ Run this on OpenMV
     :language: python
 
 Run this on Pybricks. Be sure to create a file called `pupremote.py` with
-the contents of `pupremote.py<https://github.com/antonvh/PUPRemote/blob/main/src/pupremote.py>`_.
+the contents of `pupremote.py <https://github.com/antonvh/PUPRemote/blob/main/src/pupremote.py>`_.
 
 .. literalinclude:: ../examples/openmv_simple/pybricks_spike.py
     :language: python
