@@ -1,4 +1,5 @@
 # Copy this file to OpenMV Cam H7 Plus
+# Be sure to also copy pupremote.py and lpf2.py to the camera drive
 
 ### Setup pupremote code
 from pupremote import PUPRemoteSensor, OPENMV, SPIKE_ULTRASONIC

@@ -15,5 +15,11 @@ Use this library to communicate as a Powered UP (PUP) Device with LEGO smart hub
 - import pupremote.py
 - import demo_pybricks_inventorhub or _technichub
 
-## TODO
+## Contributing
+
+Please fork and streamline the protocol. There are also some TODOs below you can help with. 
+Please notify us of projects you made with this and share the code!
+
+### TODO
 - Emulate generic sensors
+- Support SPIKE2 and Robot Inventor platforms (Only Pybricks is currently supported)
