@@ -26,13 +26,17 @@ except ImportError:
         return x
 
 MAX_PKT     = const(32)
+
+#: OpenMV board platform type
 OPENMV      = const(0)
+#: LMS-ESP32 board platform type
 ESP32       = const(1)
+
+# Dictionary keys
 NAME        = const(0)
 SIZE        = const(1)
 TO_HUB_FORMAT      = const(2)
 FROM_HUB_FORMAT    = const(3)
-CALLBACK    = const(4)
 
 #: WeDo Ultrasonic sensor id
 WEDO_ULTRASONIC = const(35)
@@ -48,7 +52,7 @@ class PUPRemote:
     """
 
     def __init__(self):
-        # Store commands, their callbacks, size and format
+        # Store commands, size and format
         self.commands = []
         # Store mode names (commands) to look up their index
         self.modes = {}
@@ -75,12 +79,11 @@ class PUPRemote:
             size_to_hub_fmt = struct.calcsize(to_hub_fmt)
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
             msg_size = max(size_to_hub_fmt,size_from_hub_fmt )
-            cb = "set_" + mode_name
+
         self.commands.append(
                 {
                 NAME: mode_name,
                 TO_HUB_FORMAT: to_hub_fmt,
-                CALLBACK: cb,
                 FROM_HUB_FORMAT: from_hub_fmt,
                 SIZE: msg_size,
                 }
@@ -166,8 +169,6 @@ class PUPRemoteSensor(PUPRemote):
         :return: True if connected to the hub, False otherwise.
         """
         # Get data from the hub
-        # TODO: make heartbeat return setter modes from hub
-        # so callbacks can be avoided.
         data = self.lpup.heartbeat()
 
         # Return data to the hub, according to the current mode
