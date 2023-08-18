@@ -181,10 +181,9 @@ class LPF2(object):
                 # Regular heartbeat pulse from the hub. We have to reply with data.
                 self.last_nack = ticks_ms() # reset heartbeat timer
 
-                # Precede the payload with a type command.
-                # Shouldn't it pass the sensor id instead of 0x00?
+                # Precede the payload with a sensor type command.
                 # Shouldn't this only apply to mode advertisements on initialize?
-                payl = bytearray([CMD_Type | LENGTH_1 | CMD_EXT_MODE, 0x00])
+                payl = bytearray([CMD_Type | LENGTH_1 | CMD_EXT_MODE, self.sensor_id])
                 payl = self.addChksm(payl)
                 self.writeIt(payl, debug=False)
 
@@ -202,7 +201,7 @@ class LPF2(object):
             elif b == 0x46:  
                 # Data from hub to sensor should read 0x46, 0x00, 0xb9
                 # print("cmd recv")
-                ext_mode = self.readchar()  # 0x00
+                ext_mode = self.readchar()  # 0x00 or 0x08
                 cksm = self.readchar()      # 0xb9
 
                 if cksm == 0xFF ^ 0x46 ^ ext_mode: 
@@ -212,21 +211,22 @@ class LPF2(object):
                     size = 2 ** ((b & 0b111000) >> 3)
 
                     # Bitmask to get the mode number
-                    self.current_mode = b & 0b111
+                    self.current_mode = (b & 0b111) + ext_mode
 
                     # Keep track of the checksum while reading data
                     ck = 0xFF ^ b
                     
-                    self.textBuffer = bytearray(b"\x00" * size)
+                    buf = bytearray(b"\x00" * size)
                     for i in range(size):
-                        # TODO: keep values in bytes instead of byte>int (ord)>byte
-                        self.textBuffer[i] = self.readchar()
+                        # TODO: keep readchar values in bytes instead of byte>int (ord)>byte
+                        buf[i] = self.readchar()
                         # Keep track of the checksum
-                        ck ^= self.textBuffer[i]
+                        ck ^= buf[i]
                         
                     assert cksm == self.readchar(), "Checksum error"
                     
-                    self.cmd_call_back(size, self.textBuffer)
+                    return buf
+        return None
 
     def writeIt(self, array, debug=False):
         if debug:
