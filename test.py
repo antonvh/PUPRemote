@@ -1,5 +1,5 @@
 import unittest
-from pd_emu import _calc_checksum
+from PUPRemote.pd_emu import _calc_checksum
 
 class TestCalcChecksum(unittest.TestCase):
 

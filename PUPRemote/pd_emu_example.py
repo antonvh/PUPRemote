@@ -1,4 +1,4 @@
-from pd_emu import PUPDeviceEmulator
+from PUPRemote.pd_emu import PUPDeviceEmulator
 from machine import UART
 uart = UART(1, 115200)
 pd = PUPDeviceEmulator(uart)
