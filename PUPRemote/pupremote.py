@@ -113,7 +113,7 @@ class PUPRemoteSensor(PUPRemote):
             self.lpup = self.LPF2.ESP_LPF2([],sensor_id=sensor_id)
         elif platform == OPENMV:
             self.lpup = self.LPF2.OpenMV_LPF2([],sensor_id=sensor_id)
-        # self.lpup.set_call_back(self.call_back)
+        self.lpup.set_call_back(self.call_back)
     
     def add_command(self, mode_name: str,  to_hub_fmt: str ="", from_hub_fmt: str="" ):
         super().add_command(mode_name, to_hub_fmt = to_hub_fmt, from_hub_fmt = from_hub_fmt)
@@ -145,20 +145,11 @@ class PUPRemoteSensor(PUPRemote):
         # Get data from the hub
         # TODO: make heartbeat return setter modes from hub
         # so callbacks can be avoided.
-        data = self.lpup.heartbeat()
+        self.lpup.heartbeat()
 
         # Return data to the hub, according to the current mode
-        mode = self.lpup.current_mode
-
-        if data is not None:
-            args = self.decode(
-                self.commands[mode][FROM_HUB_FORMAT],
-                data
-                )
-            result = eval(self.commands[mode][NAME])(*args)
-        else:
-            result = eval(self.commands[mode][NAME])()
-
+        mode=self.lpup.current_mode
+        result = eval(self.commands[mode][NAME])()
         pl = self.encode(
             self.commands[mode][SIZE], 
             self.commands[mode][TO_HUB_FORMAT], 
@@ -167,13 +158,13 @@ class PUPRemoteSensor(PUPRemote):
         self.lpup.send_payload(pl)
         return self.lpup.connected
     
-    # def call_back(self,size,data):
-    #     # data is received from hub
-    #     mode=self.lpup.current_mode
-    #     mode_name = self.commands[mode]
-    #     format = self.commands[mode][FROM_HUB_FORMAT]
-    #     cb = eval(self.commands[mode][CALLBACK])
-    #     cb(*self.decode(format,data))
+    def call_back(self,size,data):
+        # data is received from hub
+        mode=self.lpup.current_mode
+        mode_name = self.commands[mode]
+        format = self.commands[mode][FROM_HUB_FORMAT]
+        cb = eval(self.commands[mode][CALLBACK])
+        cb(*self.decode(format,data))
         
      
 
