@@ -91,7 +91,7 @@ class PUPRemote:
 
     def encode(self, size, format, *argv):
         if format=="repr":
-            s=repr(*argv)
+            s=bytes(repr(*argv), "UTF-8")
         else:
             s=struct.pack(format, *argv)
 
