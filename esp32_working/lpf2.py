@@ -218,12 +218,13 @@ class LPF2(object):
                     # Keep track of the checksum while reading data
                     ck = 0xFF ^ b
 
-                    buf = bytearray(b"\x00" * size)
+                    buf = b''
                     for i in range(size):
                         # TODO: keep readchar values in bytes instead of byte>int (ord)>byte
-                        buf[i] = self.readchar()
+                        r = self.readchar()
+                        buf += r.to_bytes(1,'little')
                         # Keep track of the checksum
-                        ck ^= buf[i]
+                        ck ^= r
 
                     assert ck == self.readchar(), "Checksum error"
 
@@ -450,3 +451,4 @@ class OpenMV_LPF2(LPF2):
 
     def fast_uart(self):
         self.uart = machine.UART(self.uartchannel, 115200)
+
