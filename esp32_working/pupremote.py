@@ -160,13 +160,13 @@ class PUPRemoteSensor(PUPRemote):
             )
 
     def process(self):
-        """
-        Process the commands. Call this function in your main loop, preferably at least once every 20ms.
-        It will handle the communication with the LEGO Hub, connect to it if needed,
-        and call the registered commands.
-        
-        :return: True if connected to the hub, False otherwise.
-        """
+        #"""
+        #Process the commands. Call this function in your main loop, preferably at least once every 20ms.
+        #It will handle the communication with the LEGO Hub, connect to it if needed,
+        #and call the registered commands.
+        #
+        #:return: True if connected to the hub, False otherwise.
+        #"""
         # Get data from the hub
         data = self.lpup.heartbeat()
 
@@ -184,7 +184,7 @@ class PUPRemoteSensor(PUPRemote):
         if self.commands[mode][TO_HUB_FORMAT]:
             result = eval(self.commands[mode][NAME])()
 
-        # and sens the result to the hub
+        # and send the result to the hub
         if result:
             if not isinstance(result, tuple):
                 result = (result,)
@@ -235,6 +235,9 @@ class PUPRemoteHub(PUPRemote):
         mode = self.modes[mode_name]
         size = self.commands[mode][SIZE] 
 
+        # read first, this sets the correct mode, also for write
+        data = self.pup_device.read(mode)
+        
         if len(argv) > 0:
             payl = self.encode(
                 size,
@@ -247,7 +250,6 @@ class PUPRemoteHub(PUPRemote):
                 )
             wait(wait_ms)
 
-        data = self.pup_device.read(mode)
         size=len(data)
         raw_data = struct.pack('%db'%size,*data)
         result = self.decode(
