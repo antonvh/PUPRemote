@@ -248,7 +248,8 @@ class PUPRemoteHub(PUPRemote):
                 mode, 
                 tuple(payl + b'\x00'*( size - len(payl)))
                 )
-            wait(wait_ms)
+            # no need to wait
+            # wait(wait_ms)
 
         size=len(data)
         raw_data = struct.pack('%db'%size,*data)
