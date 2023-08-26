@@ -127,6 +127,8 @@ class LPF2(object):
         if isinstance(data, list):
             # We have a list of integers. Pack them as bytes.
             bin_data = struct.pack("%d" % len(data) + format[data_type], *data)
+        elif isinstance(data, float) or isinstance(data, int):
+            bin_data = struct.pack(format[data_type], data)
         elif isinstance(data, str):
             # String. Convert to bytes of max size.
             bin_data = bytes(data, "UTF-8")[:MAX_PKT]
