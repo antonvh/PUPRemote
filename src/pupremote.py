@@ -115,13 +115,13 @@ class PUPRemote:
         )
         if command_type == CALLBACK:
             self.commands[-1][FROM_HUB_FORMAT] = from_hub_fmt
-            self.commands[-1][CALLABLE] = eval(mode_name)
+            # self.commands[-1][CALLABLE] = eval(mode_name)
 
         # Build a dictionary of mode names and their index
         self.modes[mode_name] = len(self.commands)-1
 
-    def decode(self, format: str, data: bytes):
-        if format == "repr":
+    def decode(self, fmt: str, data: bytes):
+        if fmt == "repr":
             str_data = data.decode("UTF-8").rstrip("\x00")
             if str_data:
                 retval = eval(str_data)
@@ -130,8 +130,8 @@ class PUPRemote:
                 retval = ""
             return (retval,) # strip zero's
         else:
-            size = struct.calcsize(format)
-            data = struct.unpack(format, data[:size])
+            size = struct.calcsize(fmt)
+            data = struct.unpack(fmt, data[:size])
 
         return data
 
@@ -187,6 +187,8 @@ class PUPRemoteSensor(PUPRemote):
     ):
         super().add_command(mode_name, to_hub_fmt, from_hub_fmt, command_type)
         writeable = 0
+        if command_type == CALLBACK:
+            self.commands[-1][CALLABLE] = eval(mode_name)
         if from_hub_fmt != "":
             writeable = self.LPF2.ABSOLUTE
         max_mode_name_len = 5 if self.power else MAX_PKT
@@ -285,6 +287,16 @@ class PUPRemoteHub(PUPRemote):
         except OSError:
             self.pup_device = None
             print("PUPDevice not ready on port", port)
+
+    def decode(self, fmt: str, data: bytes):
+        if fmt=='repr':
+            str_data = data.rstrip(b'\x00')
+            if str_data:
+                return (eval(str_data),) # strip zero's
+            else:
+                return (None,)
+        else:
+            return super().decode(fmt, data)
 
     def call(self, mode_name: str, *argv, wait_ms=100):
         """
