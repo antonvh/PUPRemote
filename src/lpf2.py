@@ -34,14 +34,6 @@ format = ["B", "H", "I", "f"]
 
 HEARTBEAT_PERIOD = 200  # time of inactivity after which we reset sensor
 
-# Name, Format [# datasets, data_type, figures, decimals],
-# raw [min,max], Percent [min,max], SI [min,max], Symbol, functionMap [type, ?], view
-# mode0 = ['LPF2-DETECT',[1,DATA8,3,0],[0,10],[0,100],[0,10],'',[ABSOLUTE,0],True]
-# mode1 = ['LPF2-COUNT',[1,DATA32,4,0],[0,100],[0,100],[0,100],'CNT',[ABSOLUTE,0],True]
-# mode2 = ['LPF2-CAL',[3,DATA16,3,0],[0,1023],[0,100],[0,1023],'RAW',[ABSOLUTE,0],False]
-# defaultModes = [mode0,mode1,mode2]
-
-
 def __num_bits(x):
     # Return the number of bits required to represent x
     n = 0
@@ -65,7 +57,8 @@ class LPF2(object):
         self.current_mode = 0
         self.sensor_id = sensor_id
         self.connected = False
-        self.payload = bytearray([])
+        # self.payload = bytearray([])
+        self.payloads = {}
         self.freq = freq
         self.oldbuffer = bytes([])
         self.textBuffer = bytearray(b"\x00" * 32)
@@ -89,15 +82,21 @@ class LPF2(object):
     ):
         fig, dec = format.split(".")
         functionmap = [ABSOLUTE, writable]
+        total_data_size = size * 2**data_type # Byte size of data set.
+        # Find the power of 2 that is greater than the length of the data
+        # -1 because of the header byte. # Really?
+        bit_size = __num_bits( total_data_size-1 )
         fred = [
-            name,
-            [size, data_type, int(fig), int(dec)],
-            raw,
-            percent,
-            SI,
-            symbol,
-            functionmap,
-            view,
+            name,           # 0
+            [size, data_type, int(fig), int(dec)], # 1
+            raw,            # 2
+            percent,        # 3
+            SI,             # 4
+            symbol,         # 5
+            functionmap,    # 6
+            view,           # 7
+            total_data_size,# 8
+            bit_size        # 9
         ]
         return fred
 
@@ -127,7 +126,7 @@ class LPF2(object):
             # We have a list of integers. Pack them as bytes.
             bin_data = struct.pack("%d" % len(data) + format[data_type], *data)
         elif isinstance(data, str):
-            # String. Convert to bytes.
+            # String. Convert to bytes of max size.
             bin_data = bytes(data, "UTF-8")[:MAX_PKT]
         elif isinstance(data, bytes):
             bin_data = data
@@ -136,24 +135,26 @@ class LPF2(object):
         else:
             raise ValueError("Wrong data type: %s" % type(data))
 
-        assert len(bin_data) <= MAX_PKT, "Payload exceeds maximum packet size"
+        bytesize = self.modes[self.current_mode][8]
+        bit = self.modes[self.current_mode][9]
 
-        # Find the power of 2 that is greater than the length of the data
-        # -1 because of the header byte
-        bit = __num_bits( len(bin_data)-1 )
+        assert len(bin_data) > 0, "Payload is empty"
+        assert len(bin_data) <= bytesize, "Wrong payload size"
 
-        payload = (
-            # Header byte
-            (CMD_Data | (bit << CMD_LLL_SHIFT) | self.current_mode).to_bytes(1,'little')
-            + bin_data
-            # Pad zero to the next power of 2
-            + b"\x00" * (2**bit - len(bin_data))
-        )
-        self.payload = self.addChksm(payload)
+        payload = bytearray(2**bit + 2)
+        cksm = 0xFF
+        payload[0] = CMD_Data | (bit << CMD_LLL_SHIFT) | self.current_mode
+        cksm ^= payload[0]
+        for i in range(len(bin_data)):
+            payload[i+1] = bin_data[i]
+            cksm ^= bin_data[i]
+        payload[-1] = cksm # No need to checksum zero bytes.
+
+        self.payloads[self.current_mode] = payload
 
     def send_payload(self, array, data_type = DATA8):
         self.load_payload(array, data_type)
-        self.writeIt(self.payload)
+        self.writeIt(self.payloads[self.current_mode])
 
     # ----- comm stuff
 
@@ -180,8 +181,8 @@ class LPF2(object):
                 self.last_nack = utime.ticks_ms() # reset heartbeat timer
 
                 # Now send the payload
-                self.writeIt(self.payload)
-                # print("payload", self.payload)
+                self.writeIt(self.payloads[self.current_mode])
+                # print("payload", self.payloads[self.current_mode])
 
             elif b == CMD_Select:
                 self.last_nack = utime.ticks_ms() # reset heartbeat timer
@@ -191,12 +192,6 @@ class LPF2(object):
                 # Calculate the checksum for two bytes.
                 if cksm == 0xFF ^ CMD_Select ^ mode:
                     self.current_mode = mode
-                    # TODO: make size calculation on mode creation
-                    size = self.modes[mode][1][0]
-                    dtype = self.modes[mode][1][1]
-                    bsize = size * 2 ** dtype
-                    if len(self.payload) != bsize+2:
-                        self.send_payload(bsize * [0])
 
             elif b == 0x46:
                 self.last_nack = utime.ticks_ms() # reset heartbeat timer
@@ -219,7 +214,6 @@ class LPF2(object):
 
                     buf = bytearray(b"\x00" * size)
                     for i in range(size):
-                        # TODO: keep readchar values in bytes instead of byte>int (ord)>byte
                         buf[i] = self.readchar()
                         # Keep track of the checksum
                         ck ^= buf[i]
@@ -328,12 +322,18 @@ class LPF2(object):
             bytearray([CMD_ModeInfo | exp | num, rangeType]) + minVal + maxVal
         )
 
-    def defineModes(self, modes):
-        length = (len(modes) - 1) & 0xFF
+    def defineModes(self):
+        length = (len(self.modes) - 1) & 0xFF
         views = 0
-        for i in modes:
-            if i[7]:
+        for i in range(len(self.modes)):
+            mode = self.modes[i]
+            if mode[7]:
                 views = views + 1
+
+            # Initialize the payload for this mode
+            self.current_mode = i
+            self.load_payload(b"\x00" * mode[8])
+
         views = (views - 1) & 0xFF
         return self.addChksm(bytearray([CMD_Mode, length, views]))
 
@@ -356,7 +356,7 @@ class LPF2(object):
         self.writeIt(
             self.setType(self.sensor_id)
         )  # set sensor_id to 35 (WeDo Ultrasonic) 61 (Spike color), 62 (Spike ultrasonic)
-        self.writeIt(self.defineModes(self.modes))  # tell how many modes
+        self.writeIt(self.defineModes())  # tell how many modes
         self.writeIt(self.defineBaud(115200))
         self.writeIt(self.defineVers(2, 2))
         num = len(self.modes) - 1
