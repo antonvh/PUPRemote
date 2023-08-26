@@ -240,7 +240,7 @@ class PUPRemoteSensor(PUPRemote):
                     # print("Error: function %s() needs arguments." % self.commands[mode][NAME])
                     pass
 
-            if result:
+            if result is not None: # Allow for 0
                 if not isinstance(result, tuple):
                     result = (result,)
                 pl = self.encode(
