@@ -73,7 +73,7 @@ class PUPRemote:
         
         """
         if to_hub_fmt == "repr" or from_hub_fmt == "repr":
-            msg_size = 32
+            msg_size = MAX_PKT
         else:
             size_to_hub_fmt = struct.calcsize(to_hub_fmt)
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
