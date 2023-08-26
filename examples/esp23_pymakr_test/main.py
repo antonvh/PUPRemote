@@ -1,5 +1,5 @@
 # main.py -- put your code here!
-print(1+2)
+print(1+6)
 print("Hello World!")
 from pupremote import PUPRemoteSensor, ESP32, SPIKE_ULTRASONIC
 

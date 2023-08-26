@@ -78,7 +78,13 @@ class PUPRemote:
         """
         self.add_command(mode_name, to_hub_fmt=to_hub_fmt, command_type=CHANNEL)
 
-    def add_command(self, mode_name: str, to_hub_fmt: str ="", from_hub_fmt: str="", command_type=CALLBACK):
+    def add_command(
+        self,
+        mode_name: str,
+        to_hub_fmt: str = "",
+        from_hub_fmt: str = "",
+        command_type=CALLBACK,
+    ):
         """Define a remote call. Use this function with identical parameters on both
         the sensor and the hub.
 
@@ -115,11 +121,11 @@ class PUPRemote:
         self.modes[mode_name] = len(self.commands)-1
 
     def decode(self, format: str, data: bytes):
-        if format=='repr':
-            try:
-                # Strip zero's.
-                retval = eval(data.rstrip(b'\x00'))
-            except:
+        if format == "repr":
+            str_data = data.decode("UTF-8").rstrip("\x00")
+            if str_data:
+                retval = eval(str_data)
+            else:
                 # Probably nothing left after stripping zero's
                 retval = ""
             return (retval,) # strip zero's
@@ -130,14 +136,15 @@ class PUPRemote:
         return data
 
     def encode(self, size, format, *argv):
-        if format=="repr":
-            s=bytes(repr(*argv), "UTF-8")
+        if format == "repr":
+            s = bytes(repr(*argv), "UTF-8")
         else:
-            s=struct.pack(format, *argv)
+            s = struct.pack(format, *argv)
 
         assert len(s) <= size, "Payload exceeds maximum packet size"
 
         return s
+
 
 class PUPRemoteSensor(PUPRemote):
     """
@@ -153,10 +160,12 @@ class PUPRemoteSensor(PUPRemote):
     :param platform: Set to ESP32 or OPENMV, defaults to ESP32.
     :type platform: int
     """
+
     try:
         import lpf2 as LPF2
     except:
         pass
+
     def __init__(self, sensor_id=1, power=False, platform=ESP32):
         super().__init__()
         self.connected = False
@@ -169,17 +178,30 @@ class PUPRemoteSensor(PUPRemote):
             self.lpup = self.LPF2.OpenMV_LPF2([],sensor_id=sensor_id)
         # self.lpup.set_call_back(self.call_back)
 
-    def add_command(self, mode_name: str,  to_hub_fmt: str ="", from_hub_fmt: str="", command_type=CALLBACK):
+    def add_command(
+        self,
+        mode_name: str,
+        to_hub_fmt: str = "",
+        from_hub_fmt: str = "",
+        command_type=CALLBACK,
+    ):
         super().add_command(mode_name, to_hub_fmt, from_hub_fmt, command_type)
-        writeable=0
+        writeable = 0
         if from_hub_fmt != "":
             writeable = self.LPF2.ABSOLUTE
         max_mode_name_len = 5 if self.power else MAX_PKT
         if len(mode_name) > max_mode_name_len:
-                print("Error: mode_name can't be longer than %d%s." % (max_mode_name_len," if power=True" if self.power else ""))
-        else: # only enable power when len(mode_name)<=5
+            print(
+                "Error: mode_name can't be longer than %d%s."
+                % (max_mode_name_len, " if power=True" if self.power else "")
+            )
+        else:  # only enable power when len(mode_name)<=5
             if self.power:
-                mode_name = mode_name.encode('ascii') + b'\x00'*(5-len(mode_name)) + b'\x00\x80\x00\x00\x00\x05\x04'
+                mode_name = (
+                    mode_name.encode("ascii")
+                    + b"\x00" * (5 - len(mode_name))
+                    + b"\x00\x80\x00\x00\x00\x05\x04"
+                )
         self.lpup.modes.append(
             self.lpup.mode(
                 mode_name,
@@ -259,10 +281,10 @@ class PUPRemoteHub(PUPRemote):
         super().__init__()
         self.port = port
         try:
-            self.pup_device=PUPDevice(port)
+            self.pup_device = PUPDevice(port)
         except OSError:
-            self.pup_device=None
-            print("PUPDevice not ready on port",port)
+            self.pup_device = None
+            print("PUPDevice not ready on port", port)
 
     def call(self, mode_name: str, *argv, wait_ms=100):
         """
@@ -304,4 +326,3 @@ class PUPRemoteHub(PUPRemote):
             return result[0]
         else:
             return result
-    

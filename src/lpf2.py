@@ -214,7 +214,7 @@ class LPF2(object):
                     # Keep track of the checksum while reading data
                     ck = 0xFF ^ b
 
-                    buf = bytearray(b"\x00" * size)
+                    buf = bytearray(size)
                     for i in range(size):
                         buf[i] = self.readchar()
                         # Keep track of the checksum
