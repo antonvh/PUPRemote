@@ -1,7 +1,12 @@
-# main.py -- put your code here!
-print(1+6)
-print("Hello World!")
+# Force reload libraries for development purposes
+import sys
+if 'pupremote' in sys.modules:
+    del sys.modules['pupremote']
+if 'lpf2' in sys.modules:
+    del sys.modules['lpf2']
+
 from pupremote import PUPRemoteSensor, ESP32, SPIKE_ULTRASONIC
+
 
 def msg(txt):
     print(txt)
