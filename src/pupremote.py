@@ -116,7 +116,13 @@ class PUPRemote:
 
     def decode(self, format: str, data: bytes):
         if format=='repr':
-            return (eval(data.replace(b'\x00', b'')),) # strip zero's
+            try:
+                # Strip zero's.
+                retval = eval(data.rstrip(b'\x00'))
+            except:
+                # Probably nothing left after stripping zero's
+                retval = ""
+            return (retval,) # strip zero's
         else:
             size = struct.calcsize(format)
             data = struct.unpack(format, data[:size])
