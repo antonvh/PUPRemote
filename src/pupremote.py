@@ -37,6 +37,7 @@ NAME        = const(0)
 SIZE        = const(1)
 TO_HUB_FORMAT      = const(2)
 FROM_HUB_FORMAT    = const(3)
+CALLABLE    = const(4)
 
 #: WeDo Ultrasonic sensor id
 WEDO_ULTRASONIC = const(35)
@@ -44,6 +45,10 @@ WEDO_ULTRASONIC = const(35)
 SPIKE_COLOR = const(61)
 #: SPIKE Ultrasonic sensor id
 SPIKE_ULTRASONIC = const(62)
+
+CALLBACK = const(0)
+CHANNEL = const(1)
+
 
 class PUPRemote:
     """
@@ -57,7 +62,23 @@ class PUPRemote:
         # Store mode names (commands) to look up their index
         self.modes = {}
 
-    def add_command(self, mode_name: str, to_hub_fmt: str ="", from_hub_fmt: str="" ):
+    def add_channel(self, mode_name: str, to_hub_fmt: str =""):
+        """
+        Define a data channel to read on the hub. Use this function with identical parameters on both
+        the sensor and the hub. You can call a channel like a command, but to update the data
+        on the sensor side, you need to `update_channel(<name>, *args)`.
+
+        :param mode_name: The name of the mode you defined on the sensor side.
+        :type mode_name: str
+        :param to_hub_fmt: The format string of the data sent from the sensor
+            to the hub. Use 'repr' to receive any python object. Or use a struct format string,
+            to receive a fixed size payload. See https://docs.python.org/3/library/struct.html
+
+        :type to_hub_fmt: str
+        """
+        self.add_command(mode_name, to_hub_fmt=to_hub_fmt, command_type=CHANNEL)
+
+    def add_command(self, mode_name: str, to_hub_fmt: str ="", from_hub_fmt: str="", command_type=CALLBACK):
         """Define a remote call. Use this function with identical parameters on both
         the sensor and the hub.
 
@@ -66,11 +87,11 @@ class PUPRemote:
         :param to_hub_fmt: The format string of the data sent from the sensor
             to the hub. Use 'repr' to receive any python object. Or use a struct format string,
             to receive a fixed size payload. See https://docs.python.org/3/library/struct.html
-        
+
         :type to_hub_fmt: str
         :param from_hub_fmt: The format string of the data sent from the hub
         :type from_hub_fmt: str
-        
+
         """
         if to_hub_fmt == "repr" or from_hub_fmt == "repr":
             msg_size = MAX_PKT
@@ -80,13 +101,16 @@ class PUPRemote:
             msg_size = max(size_to_hub_fmt,size_from_hub_fmt )
 
         self.commands.append(
-                {
-                NAME: mode_name,
-                TO_HUB_FORMAT: to_hub_fmt,
-                FROM_HUB_FORMAT: from_hub_fmt,
-                SIZE: msg_size,
-                }
-            )
+            {
+            NAME: mode_name,
+            TO_HUB_FORMAT: to_hub_fmt,
+            SIZE: msg_size,
+            }
+        )
+        if command_type == CALLBACK:
+            self.commands[-1][FROM_HUB_FORMAT] = from_hub_fmt
+            self.commands[-1][CALLABLE] = eval(mode_name)
+
         # Build a dictionary of mode names and their index
         self.modes[mode_name] = len(self.commands)-1
 
@@ -139,8 +163,8 @@ class PUPRemoteSensor(PUPRemote):
             self.lpup = self.LPF2.OpenMV_LPF2([],sensor_id=sensor_id)
         # self.lpup.set_call_back(self.call_back)
 
-    def add_command(self, mode_name: str,  to_hub_fmt: str ="", from_hub_fmt: str="" ):
-        super().add_command(mode_name, to_hub_fmt = to_hub_fmt, from_hub_fmt = from_hub_fmt)
+    def add_command(self, mode_name: str,  to_hub_fmt: str ="", from_hub_fmt: str="", command_type=CALLBACK):
+        super().add_command(mode_name, to_hub_fmt, from_hub_fmt, command_type)
         writeable=0
         if from_hub_fmt != "":
             writeable = self.LPF2.ABSOLUTE
@@ -167,32 +191,50 @@ class PUPRemoteSensor(PUPRemote):
 
         :return: True if connected to the hub, False otherwise.
         """
-        # Get data from the hub
+        # Get data from the hub and return previously stored payloads
         data = self.lpup.heartbeat()
 
-        # Return data to the hub, according to the current mode
+        # Return data to the hub, by calling a function
         mode = self.lpup.current_mode
-        result = None
-        if data is not None:
-            args = self.decode(
-                self.commands[mode][FROM_HUB_FORMAT],
-                data
-                )
-            result = eval(self.commands[mode][NAME])(*args)
+        if CALLABLE in self.commands[mode]:
+            result = None
+            if data is not None:
+                args = self.decode(
+                    self.commands[mode][FROM_HUB_FORMAT],
+                    data
+                    )
+                result = self.commands[mode][CALLABLE](*args)
 
-        if not self.commands[mode][FROM_HUB_FORMAT]:
-            result = eval(self.commands[mode][NAME])()
+            else:
+                try:
+                    result = self.commands[mode][CALLABLE]()
+                except TypeError:
+                    # print("Error: function %s() needs arguments." % self.commands[mode][NAME])
+                    pass
 
-        if result:
-            if not isinstance(result, tuple):
-                result = (result,)
-            pl = self.encode(
-                self.commands[mode][SIZE],
-                self.commands[mode][TO_HUB_FORMAT],
-                *result
-                )
-            self.lpup.send_payload(pl)
+            if result:
+                if not isinstance(result, tuple):
+                    result = (result,)
+                pl = self.encode(
+                    self.commands[mode][SIZE],
+                    self.commands[mode][TO_HUB_FORMAT],
+                    *result
+                    )
+                self.lpup.send_payload(pl)
         return self.lpup.connected
+
+    def update_channel(self, mode_name: str, *argv):
+        mode = self.modes[mode_name]
+
+        pl = self.encode(
+            self.commands[mode][SIZE],
+            self.commands[mode][TO_HUB_FORMAT],
+            *argv
+            )
+        self.lpup.load_payload(pl, mode=mode)
+        if self.lpup.current_mode == mode:
+            self.lpup.writeIt(self.lpup.payloads[mode])
+
 
 
 class PUPRemoteHub(PUPRemote):
@@ -219,12 +261,12 @@ class PUPRemoteHub(PUPRemote):
     def call(self, mode_name: str, *argv, wait_ms=100):
         """
         Call a remote function on the sensor side with the mode_name you defined on both sides.
-        
+
         :param mode_name: The name of the mode you defined on the sensor side.
         :type mode_name: str
         :param argv: As many arguments as you need to pass to the remote function.
         :type argv: Any
-        :param wait_ms: The time to wait for the sensor to respond after 
+        :param wait_ms: The time to wait for the sensor to respond after
             a write from the hub, defaults to 100ms. This does not delay the read,
             i.e. when you don't pass any arguments, the read will happen immediately.
         :type wait_ms: int

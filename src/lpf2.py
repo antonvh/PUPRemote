@@ -121,7 +121,9 @@ class LPF2(object):
 
     # -------- Payload definition
 
-    def load_payload(self, data, data_type = DATA8):
+    def load_payload(self, data, data_type = DATA8, mode = None):
+        if mode is None:
+            mode = self.current_mode
         if isinstance(data, list):
             # We have a list of integers. Pack them as bytes.
             bin_data = struct.pack("%d" % len(data) + format[data_type], *data)
@@ -135,22 +137,22 @@ class LPF2(object):
         else:
             raise ValueError("Wrong data type: %s" % type(data))
 
-        bytesize = self.modes[self.current_mode][8]
-        bit = self.modes[self.current_mode][9]
+        bytesize = self.modes[mode][8]
+        bit = self.modes[mode][9]
 
         assert len(bin_data) > 0, "Payload is empty"
         assert len(bin_data) <= bytesize, "Wrong payload size"
 
         payload = bytearray(2**bit + 2)
         cksm = 0xFF
-        payload[0] = CMD_Data | (bit << CMD_LLL_SHIFT) | self.current_mode
+        payload[0] = CMD_Data | (bit << CMD_LLL_SHIFT) | mode
         cksm ^= payload[0]
         for i in range(len(bin_data)):
             payload[i+1] = bin_data[i]
             cksm ^= bin_data[i]
         payload[-1] = cksm # No need to checksum zero bytes.
 
-        self.payloads[self.current_mode] = payload
+        self.payloads[mode] = payload
 
     def send_payload(self, array, data_type = DATA8):
         self.load_payload(array, data_type)
@@ -331,8 +333,8 @@ class LPF2(object):
                 views = views + 1
 
             # Initialize the payload for this mode
-            self.current_mode = i
-            self.load_payload(b"\x00" * mode[8])
+
+            self.load_payload(b"\x00" * mode[8], mode=i)
 
         views = (views - 1) & 0xFF
         return self.addChksm(bytearray([CMD_Mode, length, views]))
