@@ -125,6 +125,8 @@ class LPF2(object):
         if isinstance(data, list):
             # We have a list of integers. Pack them as bytes.
             bin_data = struct.pack("%d" % len(data) + format[data_type], *data)
+        elif isinstance(data,float) or isinstance(data,int):
+            bin_data = struct.pack(format[data_type], data)
         elif isinstance(data, str):
             # String. Convert to bytes.
             bin_data = bytes(data, "UTF-8")[:MAX_PKT]
@@ -179,7 +181,7 @@ class LPF2(object):
                 self.last_nack = utime.ticks_ms() # reset heartbeat timer
 
                 # Now send the payload
-                self.writeIt(self.payload)
+                self.writeIt(self.payload,debug=False)
                 # print("payload", self.payload)
 
             elif b == CMD_Select:
@@ -191,11 +193,11 @@ class LPF2(object):
                 if cksm == 0xFF ^ CMD_Select ^ mode:
                     self.current_mode = mode
                     # TODO: make size calculation on mode creation
-                    size = self.modes[mode][1][0]
-                    dtype = self.modes[mode][1][1]
-                    bsize = size * 2 ** dtype
-                    if len(self.payload) != bsize+2:
-                        self.send_payload(bsize * [0])
+                    #size = self.modes[mode][1][0]
+                    #dtype = self.modes[mode][1][1]
+                    #bsize = size * 2 ** dtype
+                    #if len(self.payload) != bsize+2:
+                    #    self.send_payload(bsize * [0])
 
             elif b == 0x46:
                 self.last_nack = utime.ticks_ms() # reset heartbeat timer
@@ -384,9 +386,12 @@ class LPF2(object):
 
 
 class ESP_LPF2(LPF2):
-    tx_pin_nr = 19
-    rx_pin_nr = 18
-    uartchannel = 2
+
+    def __init__(self, modes, sensor_id=WeDo_Ultrasonic):
+        self.tx_pin_nr = 19
+        self.rx_pin_nr = 18
+        self.uartchannel = 2
+        super().__init__(modes, sensor_id)
 
     def write_tx_pin(self, value, sleep=500):
         tx = machine.Pin(self.tx_pin_nr, machine.Pin.OUT)

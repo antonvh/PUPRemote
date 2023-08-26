@@ -179,10 +179,12 @@ class PUPRemoteSensor(PUPRemote):
                 data
                 )
             result = eval(self.commands[mode][NAME])(*args)
-
-        if not self.commands[mode][FROM_HUB_FORMAT]:
+        
+        # if there is a value to be send to the hub, get that value
+        if self.commands[mode][TO_HUB_FORMAT]:
             result = eval(self.commands[mode][NAME])()
 
+        # and sens the result to the hub
         if result:
             if not isinstance(result, tuple):
                 result = (result,)
