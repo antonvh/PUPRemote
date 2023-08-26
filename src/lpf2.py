@@ -59,7 +59,7 @@ def default_cmd_callback(size, buf):
 
 
 class LPF2(object):
-    def __init__(self, modes, sensor_id=WeDo_Ultrasonic, timer=4, freq=5):
+    def __init__(self, modes, sensor_id=WeDo_Ultrasonic, timer=4, freq=5, debug=False):
         self.txTimer = timer
         self.modes = modes
         self.current_mode = 0
@@ -71,6 +71,7 @@ class LPF2(object):
         self.textBuffer = bytearray(b"\x00" * 32)
         self.cmd_call_back = default_cmd_callback
         self.last_nack = 0
+        self.debug = debug
 
     @staticmethod
     def mode(
@@ -152,14 +153,14 @@ class LPF2(object):
 
     def send_payload(self, array, data_type = DATA8):
         self.load_payload(array, data_type)
-        self.writeIt(self.payload, debug=False)
+        self.writeIt(self.payload)
 
     # ----- comm stuff
 
-    def readchar(self, debug=False):
+    def readchar(self):
         c = self.uart.read(1)
         cbyte = ord(c) if c else -1
-        if debug:
+        if self.debug:
             print("c= 0x%02X" % cbyte)
         return cbyte
 
@@ -228,8 +229,8 @@ class LPF2(object):
                     return buf
         return None
 
-    def writeIt(self, array, debug=False):
-        if debug:
+    def writeIt(self, array):
+        if self.debug:
             print(binascii.hexlify(array))
         return self.uart.write(array)
 
