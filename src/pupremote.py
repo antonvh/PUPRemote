@@ -317,8 +317,8 @@ class PUPRemoteHub(PUPRemote):
     
         mode = self.modes[mode_name]
         size = self.commands[mode][SIZE] 
-        # read first, this sets the correct mode, also for write
-        data = self.pup_device.read(mode)
+        # Dummy read action to work around mode setting bug in Pybricks beta 2.2.0b8
+        _ = self.pup_device.read(mode)
 
         if len(argv) > 0:
             payl = self.encode(
@@ -332,6 +332,7 @@ class PUPRemoteHub(PUPRemote):
                 )
             wait(wait_ms)
 
+        data = self.pup_device.read(mode)
         size=len(data)
         raw_data = struct.pack('%db'%size,*data)
         result = self.decode(
