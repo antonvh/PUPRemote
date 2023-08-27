@@ -16,8 +16,9 @@ def listen():
         print(CMD_IDS[id])
     else:
         print('Unknown command ID: %d' % id)
-
+    sleep_ms(5) # Don't read i2c too often.
     return id
+    
 
 
 pr = PUPRemoteSensor(platform=ESP32, sensor_id=SPIKE_ULTRASONIC)
