@@ -19,11 +19,15 @@ except:
 
 try:
     from micropython import const
+    from time import ticks_ms
 except ImportError:
     # micropython.const() is not available on normal Python
     # but we can use a normal function instead for unit tests
     def const(x):
         return x
+    from time import time as time_s
+    def ticks_ms():
+        return round(time_s()*1000)
 
 MAX_PKT     = const(32)
 
@@ -122,13 +126,14 @@ class PUPRemote:
 
     def decode(self, fmt: str, data: bytes):
         if fmt == "repr":
-            str_data = data.decode("UTF-8").rstrip("\x00")
-            if str_data:
-                retval = eval(str_data)
+            # Remove trailing zero's (b'\x00') and eval the string
+            clean = bytearray( [c for c in data if c != ] )
+            if clean:
+                return (eval(clean),)
             else:
                 # Probably nothing left after stripping zero's
-                retval = ""
-            return (retval,) # strip zero's
+                return ('',)
+            
         else:
             size = struct.calcsize(fmt)
             data = struct.unpack(fmt, data[:size])
@@ -171,6 +176,8 @@ class PUPRemoteSensor(PUPRemote):
         self.connected = False
         self.power = power
         self.mode_names = []
+        self.last_heartbeat = ticks_ms()
+        self.heartbeat_interval = 20
 
         if platform == ESP32:
             self.lpup = self.LPF2.ESP_LPF2([],sensor_id=sensor_id)
@@ -221,10 +228,16 @@ class PUPRemoteSensor(PUPRemote):
 
         :return: True if connected to the hub, False otherwise.
         """
+        # Check if it's not to early to process a heartbeat
+        if ticks_ms() - self.last_heartbeat < self.heartbeat_interval:
+            return self.lpup.connected
+        else:
+            self.last_heartbeat = ticks_ms()
+            
         # Get data from the hub and return previously stored payloads
         data = self.lpup.heartbeat()
 
-        # Return data to the hub, by calling a function
+        # Send data to the hub, by calling a function
         mode = self.lpup.current_mode
         if CALLABLE in self.commands[mode]:
             result = None
@@ -287,16 +300,6 @@ class PUPRemoteHub(PUPRemote):
         except OSError:
             self.pup_device = None
             print("PUPDevice not ready on port", port)
-
-    def decode(self, fmt: str, data: bytes):
-        if fmt=='repr':
-            str_data = data.rstrip(b'\x00')
-            if str_data:
-                return (eval(str_data),) # strip zero's
-            else:
-                return (None,)
-        else:
-            return super().decode(fmt, data)
 
     def call(self, mode_name: str, *argv, wait_ms=100):
         """

@@ -25,4 +25,3 @@ pr.add_command('listen', to_hub_fmt='b')
 
 while(True):
     connected=pr.process()
-    sleep_ms(20)
