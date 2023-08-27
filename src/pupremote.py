@@ -7,6 +7,7 @@ try:
     from pybricks.iodevices import PUPDevice
     from pybricks.tools import wait
 except:
+    # We surely aren't on pybricks.
     class PUPDevice:
         def __init__(self, port):
             pass
@@ -16,18 +17,23 @@ except:
             pass
     def wait(ms):
         pass
+    # Pybricks has no time module, so here it's safe to import
+    try:
+        from time import ticks_ms
+    except:
+        from time import time as time_s
+        def ticks_ms():
+            return round(time_s()*1000)
 
 try:
     from micropython import const
-    from time import ticks_ms
 except ImportError:
     # micropython.const() is not available on normal Python
     # but we can use a normal function instead for unit tests
     def const(x):
         return x
-    from time import time as time_s
-    def ticks_ms():
-        return round(time_s()*1000)
+
+
 
 MAX_PKT     = const(32)
 
@@ -318,7 +324,12 @@ class PUPRemoteHub(PUPRemote):
         mode = self.modes[mode_name]
         size = self.commands[mode][SIZE] 
         # Dummy read action to work around mode setting bug in Pybricks beta 2.2.0b8
-        _ = self.pup_device.read(mode)
+        # Also check if a sensor or sensor emulator is connected.abs
+        try:
+            self.pup_device.read(mode)
+        except:
+            print("PUPRemote Error: Nothing connected or no script running on remote\n")
+            return None
 
         if len(argv) > 0:
             payl = self.encode(
