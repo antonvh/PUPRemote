@@ -11,12 +11,12 @@ from time import sleep_ms
 s=SENS0539()
 
 def listen():
+    sleep_ms(5) # Don't read i2c too often.
     id = s.get_cmd_id()
     if id in CMD_IDS:
         print(CMD_IDS[id])
     else:
         print('Unknown command ID: %d' % id)
-    sleep_ms(5) # Don't read i2c too often.
     return id
     
 
