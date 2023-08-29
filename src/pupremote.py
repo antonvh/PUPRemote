@@ -270,6 +270,10 @@ class PUPRemoteSensor(PUPRemote):
                     *result
                     )
                 self.lpup.send_payload(pl)
+        else:
+            # No callback. Just write the stored data from self.update_channel()
+            self.lpup.writeIt(self.lpup.payloads[mode])
+
         return self.lpup.connected
 
     def update_channel(self, mode_name: str, *argv):
@@ -281,9 +285,6 @@ class PUPRemoteSensor(PUPRemote):
             *argv
             )
         self.lpup.load_payload(pl, mode=mode)
-        if self.lpup.current_mode == mode:
-            self.lpup.writeIt(self.lpup.payloads[mode])
-
 
 
 class PUPRemoteHub(PUPRemote):
