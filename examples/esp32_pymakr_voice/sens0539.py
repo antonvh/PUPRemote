@@ -1,9 +1,20 @@
 from machine import SoftI2C, Pin
+from micropython import const
+from time import sleep_ms
 
-REG_GET_CMD_ID = 0x02
-REG_PLAY_CMD_ID = 0x03
+## Address of the register for requesting command word ID
+REG_GET_CMD_ID = const(0x02)
+## Address of the register for playing audio by command word ID
+REG_PLAY_CMD_ID = const(0x03)
+## i2c address
+SEN0539_I2C_ADDR      = const(0x64)
+## Register for setting mute mode
+REG_SET_MUTE          = const(0x04)
+## Register for setting volume
+REG_SET_VOLUME        = const(0x05)
+## Address of the register for wake-up time
+REG_WAKE_TIME         = const(0x06)
 
-REG_SET_VOL = 0x05
 
 CMD_IDS = {
     0: "Listening...",
@@ -160,14 +171,73 @@ CMD_IDS = {
 
 
 class SENS0539:
-    def __init__(self, i2c=None, addr=0x64):
+    def __init__(self, scl_io=2, sda_io=26, i2c=None, addr=SEN0539_I2C_ADDR):
         if i2c is None:
-            i2c = SoftI2C(scl=Pin(2), sda=Pin(26))
+            i2c = SoftI2C(scl=Pin(scl_io), sda=Pin(sda_io))
         self.i2c = i2c
         self.addr = addr
 
     def get_cmd_id(self):
-        id = self.i2c.readfrom_mem(self.addr, REG_GET_CMD_ID, 1)
+        """
+        Get the command word ID of the last identified command word
 
+        :return: Command word ID
+        :rtype: int
+        """
+        sleep_ms(20) # Don't overload the sensor
+        id = self.i2c.readfrom_mem(self.addr, REG_GET_CMD_ID, 1)
         return id[0]
+    
+    def play_cmd_id(self, cmd_id):
+        """
+        Play the corresponding reply audio according to the command word ID in CMD_IDS
+        Can enter wake-up state through ID-1 in I2C mode
+
+        :param cmd_id: Command word ID
+        :type cmd_id: int
+        """
+        self.i2c.writeto_mem(self.addr, REG_PLAY_CMD_ID, bytes([cmd_id]))
+        sleep_ms(500) # Don't overload the sensor
+
+    def get_wake_time(self):
+        """
+        Get the wake duration, before sensor says "I'm off now" and
+        you have to wake it again with the wake word.
+
+        :return: The current set wake-up period
+        :rtype: int
+        """
+        return self.i2c.readfrom_mem(self.addr, REG_WAKE_TIME, 1)[0]
+
+    def set_wake_time(self, wake_time:int):
+        """
+        Set wake duration
+
+        :param wake_time: Wake duration, range 0~255, unit: 1s
+        :type wake_time: int
+        """
+        wake_time = wake_time & 0xFF
+        self.i2c.writeto_mem(self.addr, REG_WAKE_TIME, bytes([wake_time]))
+
+    def set_volume(self, vol:int):
+        """
+        Set voice volume
+
+        :param vol: Volume value(1~7)
+        :type vol: int
+        """
+        vol = vol & 0x07
+        self.i2c.writeto_mem(self.addr, REG_SET_VOLUME, bytes([vol]))
+
+    def set_mute_mode(self, mode):
+        """
+        Set mute mode
+
+        :param mode: Mute mode; set value 1: mute, 0: unmute
+        :type mode: int
+        """
+        if mode:
+            self.i2c.writeto_mem(self.addr, REG_SET_MUTE, bytes([0x01]))
+        else:
+            self.i2c.writeto_mem(self.addr, REG_SET_MUTE, bytes([0x00]))
     
