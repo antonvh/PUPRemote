@@ -219,9 +219,11 @@ class LPF2(object):
                         # Keep track of the checksum
                         ck ^= buf[i]
 
-                    assert ck == self.readchar(), "Checksum error"
+                    if ck == self.readchar():
+                        return buf
+                    else:
+                        print("Checksum error")
 
-                    return buf
 
     def writeIt(self, array):
         if self.debug:
