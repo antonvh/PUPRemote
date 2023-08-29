@@ -175,12 +175,9 @@ class LPF2(object):
             self.last_nack = utime.ticks_ms()
             self.initialize()
 
-        b = self.readchar()  # read in any heartbeat bytes
-        if b >= 0:  # keep reading next character
-            if b == 0:  # port has not been setup yet
-                pass
-
-            elif b == BYTE_NACK:
+        b = self.readchar()  # Read in any heartbeat or command bytes
+        if b > 0:  # There is data, let's see what it is.
+            if b == BYTE_NACK:
                 # Regular heartbeat pulse from the hub. We have to reply with data.
                 self.last_nack = utime.ticks_ms() # reset heartbeat timer
 
@@ -225,7 +222,6 @@ class LPF2(object):
                     assert ck == self.readchar(), "Checksum error"
 
                     return buf
-        return None
 
     def writeIt(self, array):
         if self.debug:
