@@ -8,8 +8,6 @@ from pupremote import PUPRemoteHub
 
 
 p=PUPRemoteHub(Port.A)
-
-
 p.add_command('listen', to_hub_fmt="b")
 
 while 1:

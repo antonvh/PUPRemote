@@ -6,12 +6,11 @@ if 'lpf2' in sys.modules:
     del sys.modules['lpf2']
 
 from pupremote import PUPRemoteSensor, ESP32, SPIKE_ULTRASONIC
-from sens0539 import SENS0539, CMD_IDS
+from sen0539 import SEN0539, CMD_IDS
 from time import sleep_ms
-s=SENS0539()
+s=SEN0539()
 
 def listen():
-    sleep_ms(5) # Don't read i2c too often.
     id = s.get_cmd_id()
     if id in CMD_IDS:
         print(CMD_IDS[id])

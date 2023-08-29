@@ -20,16 +20,6 @@ db=DriveBase(lm, rm, 56, 120)
 
 p.add_command('listen', to_hub_fmt="b")
 
-# 22: "Go forward",
-# 23: "Retreat",
-# 24: "Park a car",
-# 25: "Turn left ninety degrees",
-# 26: "Turn left forty-five degrees",
-# 27: "Turn left thirty degrees",
-# 28: "Turn right ninety degrees",
-# 29: "Turn right forty-five degrees",
-# 30: "Turn right thirty degrees",
-
 while 1:
     ans = p.call('listen')
     if ans > 0:

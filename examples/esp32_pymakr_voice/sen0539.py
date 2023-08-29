@@ -1,3 +1,6 @@
+# Micropython i2c library for SEN0539-EN Voice Recognition Module by DFRobot
+# DFRobot_DF2301Q Class infrastructure, implementation of underlying methods
+
 from machine import SoftI2C, Pin
 from micropython import const
 from time import sleep_ms
@@ -170,7 +173,7 @@ CMD_IDS = {
 }
 
 
-class SENS0539:
+class SEN0539:
     def __init__(self, scl_io=2, sda_io=26, i2c=None, addr=SEN0539_I2C_ADDR):
         if i2c is None:
             i2c = SoftI2C(scl=Pin(scl_io), sda=Pin(sda_io))
@@ -204,7 +207,7 @@ class SENS0539:
         Get the wake duration, before sensor says "I'm off now" and
         you have to wake it again with the wake word.
 
-        :return: The current set wake-up period
+        :return: The current set wake-up period in seconds
         :rtype: int
         """
         return self.i2c.readfrom_mem(self.addr, REG_WAKE_TIME, 1)[0]
@@ -216,18 +219,23 @@ class SENS0539:
         :param wake_time: Wake duration, range 0~255, unit: 1s
         :type wake_time: int
         """
-        wake_time = wake_time & 0xFF
+        wake_time &= 0xFF # Make sure it's 8 bits
         self.i2c.writeto_mem(self.addr, REG_WAKE_TIME, bytes([wake_time]))
 
     def set_volume(self, vol:int):
         """
-        Set voice volume
+        Set voice volume. 0 mutes.
 
-        :param vol: Volume value(1~7)
+        :param vol: Volume value 0 - 20
         :type vol: int
         """
-        vol = vol & 0x07
-        self.i2c.writeto_mem(self.addr, REG_SET_VOLUME, bytes([vol]))
+        if vol == 0:
+            self.set_mute_mode(1)
+        else:
+            self.set_mute_mode(0)
+            sleep_ms(20) # Don't overload the sensor
+            vol &= 0xFF # Make sure it's 8 bits
+            self.i2c.writeto_mem(self.addr, REG_SET_VOLUME, bytes([vol]))
 
     def set_mute_mode(self, mode):
         """
