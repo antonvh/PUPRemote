@@ -10,15 +10,15 @@ REG_GET_CMD_ID = const(0x02)
 ## Address of the register for playing audio by command word ID
 REG_PLAY_CMD_ID = const(0x03)
 ## i2c address
-SEN0539_I2C_ADDR      = const(0x64)
+SEN0539_I2C_ADDR = const(0x64)
 ## Register for setting mute mode
-REG_SET_MUTE          = const(0x04)
+REG_SET_MUTE = const(0x04)
 ## Register for setting volume
-REG_SET_VOLUME        = const(0x05)
+REG_SET_VOLUME = const(0x05)
 ## Address of the register for wake-up time
-REG_WAKE_TIME         = const(0x06)
+REG_WAKE_TIME = const(0x06)
 
-
+#: All command words and their IDs
 CMD_IDS = {
     0: "Listening...",
     1: "Wake-up words for learning",
@@ -169,14 +169,27 @@ CMD_IDS = {
     205: "Delete wake word",
     206: "Delete command word",
     207: "Exit deleting",
-    208: "Delete all"
+    208: "Delete all",
 }
 
 
 class SEN0539:
-    def __init__(self, scl_io=2, sda_io=26, i2c=None, addr=SEN0539_I2C_ADDR):
+    """
+    Class for SEN0539-EN Voice Recognition Module by DFRobot
+
+    :param scl: SCL pin number, default 2
+    :type scl: int
+    :param sda: SDA pin number, default 26
+    :type sda: int
+    :param i2c: I2C object, default None creates a new one
+    :type i2c: I2C
+    :param addr: I2C address of SEN0539 sensor, default 0x64
+    :type addr: int
+    """
+
+    def __init__(self, scl=2, sda=26, i2c=None, addr=SEN0539_I2C_ADDR):
         if i2c is None:
-            i2c = SoftI2C(scl=Pin(scl_io), sda=Pin(sda_io))
+            i2c = SoftI2C(scl=Pin(scl), sda=Pin(sda))
         self.i2c = i2c
         self.addr = addr
 
@@ -187,10 +200,10 @@ class SEN0539:
         :return: Command word ID
         :rtype: int
         """
-        sleep_ms(20) # Don't overload the sensor
+        sleep_ms(20)  # Don't overload the sensor
         id = self.i2c.readfrom_mem(self.addr, REG_GET_CMD_ID, 1)
         return id[0]
-    
+
     def play_cmd_id(self, cmd_id):
         """
         Play the corresponding reply audio according to the command word ID in CMD_IDS
@@ -200,7 +213,7 @@ class SEN0539:
         :type cmd_id: int
         """
         self.i2c.writeto_mem(self.addr, REG_PLAY_CMD_ID, bytes([cmd_id]))
-        sleep_ms(500) # Don't overload the sensor
+        sleep_ms(500)  # Don't overload the sensor
 
     def get_wake_time(self):
         """
@@ -212,17 +225,17 @@ class SEN0539:
         """
         return self.i2c.readfrom_mem(self.addr, REG_WAKE_TIME, 1)[0]
 
-    def set_wake_time(self, wake_time:int):
+    def set_wake_time(self, wake_time: int):
         """
         Set wake duration
 
         :param wake_time: Wake duration, range 0~255, unit: 1s
         :type wake_time: int
         """
-        wake_time &= 0xFF # Make sure it's 8 bits
+        wake_time &= 0xFF  # Make sure it's 8 bits
         self.i2c.writeto_mem(self.addr, REG_WAKE_TIME, bytes([wake_time]))
 
-    def set_volume(self, vol:int):
+    def set_volume(self, vol: int):
         """
         Set voice volume. 0 mutes.
 
@@ -233,8 +246,8 @@ class SEN0539:
             self.set_mute_mode(1)
         else:
             self.set_mute_mode(0)
-            sleep_ms(20) # Don't overload the sensor
-            vol &= 0xFF # Make sure it's 8 bits
+            sleep_ms(20)  # Don't overload the sensor
+            vol &= 0xFF  # Make sure it's 8 bits
             self.i2c.writeto_mem(self.addr, REG_SET_VOLUME, bytes([vol]))
 
     def set_mute_mode(self, mode):
@@ -248,4 +261,3 @@ class SEN0539:
             self.i2c.writeto_mem(self.addr, REG_SET_MUTE, bytes([0x01]))
         else:
             self.i2c.writeto_mem(self.addr, REG_SET_MUTE, bytes([0x00]))
-    
