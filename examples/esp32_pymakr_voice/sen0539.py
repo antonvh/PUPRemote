@@ -1,9 +1,21 @@
 # Micropython i2c library for SEN0539-EN Voice Recognition Module by DFRobot
 # DFRobot_DF2301Q Class infrastructure, implementation of underlying methods
 
-from machine import SoftI2C, Pin
+
 from micropython import const
 from time import sleep_ms
+from sys import platform
+
+ESP = const(0)
+OPENMV = const(1)
+PFRM = ESP
+if "OpenMV" in platform:
+    PFRM = OPENMV
+    from pyb import I2C
+    i2c4 = I2C(4, I2C.MASTER)
+else:
+    from machine import SoftI2C, Pin
+    
 
 ## Address of the register for requesting command word ID
 REG_GET_CMD_ID = const(0x02)
@@ -181,7 +193,9 @@ class SEN0539:
     :type scl: int
     :param sda: SDA pin number, default 26
     :type sda: int
-    :param i2c: I2C object, default None creates a new one
+    :param i2c: I2C object, default None creates a new one with the scl and sda pins. 
+        If using OpenMV, it defaults to i2c on bus 4 (sda=P8, scl=P7)
+
     :type i2c: I2C
     :param addr: I2C address of SEN0539 sensor, default 0x64
     :type addr: int
@@ -189,7 +203,10 @@ class SEN0539:
 
     def __init__(self, scl=2, sda=26, i2c=None, addr=SEN0539_I2C_ADDR):
         if i2c is None:
-            i2c = SoftI2C(scl=Pin(scl), sda=Pin(sda))
+            if PFRM == OPENMV:
+                i2c = i2c4
+            else:
+                i2c = SoftI2C(scl=Pin(scl), sda=Pin(sda))
         self.i2c = i2c
         self.addr = addr
 
@@ -201,8 +218,7 @@ class SEN0539:
         :rtype: int
         """
         sleep_ms(20)  # Don't overload the sensor
-        id = self.i2c.readfrom_mem(self.addr, REG_GET_CMD_ID, 1)
-        return id[0]
+        return self.rd(REG_GET_CMD_ID)
 
     def play_cmd_id(self, cmd_id):
         """
@@ -212,7 +228,7 @@ class SEN0539:
         :param cmd_id: Command word ID
         :type cmd_id: int
         """
-        self.i2c.writeto_mem(self.addr, REG_PLAY_CMD_ID, bytes([cmd_id]))
+        self.wr(REG_PLAY_CMD_ID, cmd_id)
         sleep_ms(500)  # Don't overload the sensor
 
     def get_wake_time(self):
@@ -223,7 +239,7 @@ class SEN0539:
         :return: The current set wake-up period in seconds
         :rtype: int
         """
-        return self.i2c.readfrom_mem(self.addr, REG_WAKE_TIME, 1)[0]
+        return self.rd(REG_WAKE_TIME)
 
     def set_wake_time(self, wake_time: int):
         """
@@ -232,8 +248,7 @@ class SEN0539:
         :param wake_time: Wake duration, range 0~255, unit: 1s
         :type wake_time: int
         """
-        wake_time &= 0xFF  # Make sure it's 8 bits
-        self.i2c.writeto_mem(self.addr, REG_WAKE_TIME, bytes([wake_time]))
+        self.wr(REG_WAKE_TIME, wake_time)
 
     def set_volume(self, vol: int):
         """
@@ -247,8 +262,7 @@ class SEN0539:
         else:
             self.set_mute_mode(0)
             sleep_ms(20)  # Don't overload the sensor
-            vol &= 0xFF  # Make sure it's 8 bits
-            self.i2c.writeto_mem(self.addr, REG_SET_VOLUME, bytes([vol]))
+            self.wr(REG_SET_VOLUME, vol)
 
     def set_mute_mode(self, mode):
         """
@@ -258,6 +272,35 @@ class SEN0539:
         :type mode: int
         """
         if mode:
-            self.i2c.writeto_mem(self.addr, REG_SET_MUTE, bytes([0x01]))
+            self.wr(REG_SET_MUTE, 1)
         else:
-            self.i2c.writeto_mem(self.addr, REG_SET_MUTE, bytes([0x00]))
+            self.wr(REG_SET_MUTE, 0)
+
+    def rd(self, reg):
+        """
+        Read a register
+
+        :param reg: Register address
+        :type reg: int
+        :return: Register value
+        :rtype: int
+        """
+        if PFRM == OPENMV:
+            return self.i2c.mem_read(1, self.addr, reg)[0]
+        else:
+            return self.i2c.readfrom_mem(self.addr, reg, 1)[0]
+        
+    def wr(self, reg, val):
+        """
+        Write a register
+
+        :param reg: Register address
+        :type reg: int
+        :param val: Register value
+        :type val: int
+        """
+        val &= 0xFF  # Make sure it's 8 bits
+        if PFRM == OPENMV:
+            self.i2c.mem_write(val, self.addr, reg)
+        else:
+            self.i2c.writeto_mem(self.addr, reg, bytes([val]))
