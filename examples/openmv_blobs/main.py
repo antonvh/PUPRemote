@@ -12,24 +12,11 @@ WeDo_Ultrasonic, SPIKE_Color, SPIKE_Ultrasonic = 35, 61, 62
 x,y,pixels = 0,0,0
 
 def get_blob():
-    global x,y,pixels
+    # global x,y,pixels
     return x,y,pixels
-
-def msg(txt):
-    print(txt)
-    return txt+txt
-
-def num(n):
-    print(n)
-    return 2*n
 
 p=PUPRemoteSensor(sensor_id=SPIKE_Ultrasonic, platform=OPENMV)
 p.add_command('get_blob','hhh')
-p.add_command('msg',"repr","repr")
-p.add_command('num',from_hub_fmt="b", to_hub_fmt="b")
-
-### End of pupremote setup code
-
 
 
 # Single Color RGB565 Blob Tracking Example
@@ -70,20 +57,12 @@ while(True):
         if blob.pixels() > pixels:
             largest_blob = blob
             pixels = blob.pixels()
-        # These values depend on the blob not being circular - otherwise they will be shaky.
-#        if blob.elongation() > 0.5:
-#            img.draw_edges(blob.min_corners(), color=(255,0,0))
-#            img.draw_line(blob.major_axis_line(), color=(0,255,0))
-#            img.draw_line(blob.minor_axis_line(), color=(0,0,255))
-        # These values are stable all the time.
     if pixels > 0:
         img.draw_rectangle(largest_blob.rect(), thickness = 2)
         x = largest_blob.cx()
         y = largest_blob.cy()
         img.draw_cross(largest_blob.cx(), largest_blob.cy(), thickness=2)
-        # Note - the blob rotation is unique to 0-180 only.
-#        img.draw_keypoints([(blob.cx(), blob.cy(), int(math.degrees(blob.rotation())))], size=20)
-    lcd.display(img.scale(x_scale=0.4, y_scale=0.4, copy=True))
-
+    
     state=p.process()
-#    print(clock.fps())
+
+    lcd.display(img.scale(x_scale=0.4, y_scale=0.4, copy=True))
