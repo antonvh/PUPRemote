@@ -1,3 +1,9 @@
+__author__ = "Anton Vanhoucke & Ste7an"
+__copyright__ = "Copyright 2023, AntonsMindstorms.com"
+__license__ = "GPL"
+__version__ = "1.0.1"
+__status__ = "Production"
+
 try:
     import ustruct as struct
 except ImportError:

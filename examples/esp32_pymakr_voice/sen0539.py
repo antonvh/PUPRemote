@@ -1,9 +1,17 @@
 # Micropython i2c library for SEN0539-EN Voice Recognition Module by DFRobot
 # DFRobot_DF2301Q Class infrastructure, implementation of underlying methods
+# Get the sensor here: https://www.dfrobot.com/product-2665.html?tracking=KuVJyhg7ViWvTzwnTpVkQztSs49q2bHS4iXsF0r8KiKJVoz20ppvOx4FHfVbONxc
 
+# This file is part mpy-robot-tools.
+
+__author__ = "Anton Vanhoucke"
+__copyright__ = "Copyright 2023, AntonsMindstorms.com"
+__license__ = "GPL"
+__version__ = "1.0.1"
+__status__ = "Production"
 
 from micropython import const
-from time import sleep_ms
+from utime import sleep_ms, ticks_ms, ticks_diff
 from sys import platform
 
 ESP = const(0)
@@ -209,6 +217,9 @@ class SEN0539:
                 i2c = SoftI2C(scl=Pin(scl), sda=Pin(sda))
         self.i2c = i2c
         self.addr = addr
+        if not addr in self.i2c.scan():
+            print("Warning: No I2C device found on addr " + repr(hex(addr)) )
+        self.lr = ticks_ms()  # Last read time
 
     def get_cmd_id(self):
         """
@@ -217,8 +228,12 @@ class SEN0539:
         :return: Command word ID
         :rtype: int
         """
-        sleep_ms(20)  # Don't overload the sensor
-        return self.rd(REG_GET_CMD_ID)
+        if ticks_diff(ticks_ms(), self.lr) > 50:
+            # Don't overload the sensor
+            self.lr = ticks_ms() 
+            return self.rd(REG_GET_CMD_ID)
+        else:
+            return 0
 
     def play_cmd_id(self, cmd_id):
         """
@@ -277,30 +292,20 @@ class SEN0539:
             self.wr(REG_SET_MUTE, 0)
 
     def rd(self, reg):
-        """
-        Read a register
-
-        :param reg: Register address
-        :type reg: int
-        :return: Register value
-        :rtype: int
-        """
-        if PFRM == OPENMV:
-            return self.i2c.mem_read(1, self.addr, reg)[0]
-        else:
-            return self.i2c.readfrom_mem(self.addr, reg, 1)[0]
+        try:
+            if PFRM == OPENMV:
+                return self.i2c.mem_read(1, self.addr, reg, timeout=100)[0]
+            else:
+                return self.i2c.readfrom_mem(self.addr, reg, 1)[0]
+        except:
+            return -1
         
     def wr(self, reg, val):
-        """
-        Write a register
-
-        :param reg: Register address
-        :type reg: int
-        :param val: Register value
-        :type val: int
-        """
         val &= 0xFF  # Make sure it's 8 bits
-        if PFRM == OPENMV:
-            self.i2c.mem_write(val, self.addr, reg)
-        else:
-            self.i2c.writeto_mem(self.addr, reg, bytes([val]))
+        try:
+            if PFRM == OPENMV:
+                self.i2c.mem_write(val, self.addr, reg)
+            else:
+                self.i2c.writeto_mem(self.addr, reg, bytes([val]))
+        except:
+            pass
