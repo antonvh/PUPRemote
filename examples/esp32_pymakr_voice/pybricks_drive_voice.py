@@ -3,14 +3,11 @@
 # Put the sensor in i2c mode.
 # https://wiki.dfrobot.com/SKU_SEN0539-EN_Gravity_Voice_Recognition_Module_I2C_UART
 
-from pybricks.hubs import PrimeHub
 from pybricks.pupdevices import Motor, ColorSensor, UltrasonicSensor, ForceSensor
 from pybricks.parameters import Button, Color, Direction, Port, Side, Stop
 from pybricks.robotics import DriveBase
 from pybricks.tools import wait, StopWatch
-from pybricks.iodevices import PUPDevice
 from pupremote import PUPRemoteHub
-
 
 p=PUPRemoteHub(Port.A)
 lm = Motor(Port.C)
