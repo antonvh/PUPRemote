@@ -314,7 +314,7 @@ class PUPRemoteHub(PUPRemote):
             self.pup_device = None
             print("PUPDevice not ready on port", port)
 
-    def call(self, mode_name: str, *argv, wait_ms=100):
+    def call(self, mode_name: str, *argv, wait_ms=0):
         """
         Call a remote function on the sensor side with the mode_name you defined on both sides.
 
