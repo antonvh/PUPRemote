@@ -1,5 +1,4 @@
-# Trimmed version of pupremote that only runs on Pybricks hubs.
-# Saves memory.
+# Trimmed version of pupremote that only runs on Pybricks hubs
 
 import ustruct as struct
 from pybricks.iodevices import PUPDevice
@@ -104,7 +103,7 @@ class PUPRemote:
     def decode(self, fmt: str, data: bytes):
         if fmt == "repr":
             # Remove trailing zero's (b'\x00') and eval the string
-            clean = bytearray( [c for c in data if c != 0] )
+            clean = data.rstrip(b'\x00')
             if clean:
                 return (eval(clean),)
             else:
