@@ -349,12 +349,6 @@ class PUPRemoteHub(PUPRemote):
                 tuple(payl + b'\x00'*( size - len(payl)))
                 )
             wait(wait_ms)
-        else:
-            # Pass enough 0x00 bytes as payload
-            self.pup_device.write(
-                mode, 
-                tuple(b'\x00'*size)
-                )
 
         data = self.pup_device.read(mode)
         size=len(data)
