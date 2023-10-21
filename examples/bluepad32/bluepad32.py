@@ -50,6 +50,43 @@ class BluePad:
         else:
             return None
 
+    def btns_pressed(self,btns,nintendo=False):
+        """
+        Decodes the buttons pressed and converts the buttons to a string
+        containing the pressed buttons ['X','O','[]','Δ']
+
+        :param btns: The word read from the gamepad containing the binary encodeing of pressed buttons
+        : type btns: Word
+        :param nintendo: Indicates that a nintendo gamepad is used.
+        :return: String with pressed buttons
+        """  
+        bits_btns=[int(i) for i in bin(btns)[2:]] # convert to binary, remove '0b' 
+        bits_btns.reverse()
+        if nintendo:
+            btn_val=['B','A','Y','X','L','R','ZL','ZR']
+        else:
+            btn_val=['X','O','[]','V']
+        btns_string=[j  for i,j in zip(bits_btns,btn_val) if i]
+        return btns_string
+
+    def dpad_pressed(self,btns,nintendo=False):
+        """
+        Decodes the dpad-buttons pressed and converts the buttons to a string
+        containing the pressed buttons ['L','R','U','D']
+
+        :param btns: The word read from the gamepad containing the binary encoding of pressed dpad-buttons
+        : type btns: Word
+
+        :return: String with pressed dpad-buttons
+        """  
+        bits_btns=[int(i) for i in bin(btns)[2:]] # convert to binary, remove '0b' 
+        bits_btns.reverse()
+        if nintendo:
+            btn_val=['U','D','R','L']
+        else:
+            btn_val=['D','R','L','U']
+        btns_string=[j  for i,j in zip(bits_btns,btn_val) if i]
+        return btns_string
 
     def neopixel_init(self,nr_leds,pin):
         """
