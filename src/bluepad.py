@@ -108,23 +108,19 @@ class BluePad:
         self.nr_leds=nr_leds
         return r
 
-    def neopixel_fill(self,r,g,b,write=True):
+    def neopixel_fill(self,color,write=True):
         """
         Fills all the neopixels with the same color.
 
-        :param r: red color value
-        :type r: byte
-        :param g: green color value
-        :type g: byte
-        :param b: blue color value
-        :type b: byte
+        :param color: tuple with (red,green,blue) color.
+        :type r: tuple
         :param write: If True write the output to the NeoPixels. Defaults to True.
         :type write: bool
         """
         global cur_mode
         leds=[0]*16
         leds[0]=FILL|WRITE if write else FILL
-        leds[1:4]=[r,g,b]
+        leds[1:4]=color
         r=self.prh.call('gpled',*leds)
         self.cur_mode=0
         return r
@@ -143,7 +139,7 @@ class BluePad:
         return r
 
 
-    def neopixel_set(self,led_nr,r,g,b,write=True):
+    def neopixel_set(self,led_nr,color,write=True):
         """
         Sets single NeoPixel at position led_nr with color=(r,g,b).
 
@@ -162,7 +158,7 @@ class BluePad:
             print("error neopixel_set: led_nr larger than number of leds!")
             r=None
         else:
-            leds[3:6]=[r,g,b]
+            leds[3:6]=color
             r=self.prh.call('gpled',*leds)
         self.cur_mode=0
         return r
@@ -175,7 +171,7 @@ class BluePad:
         :type start_led: byte
         :param nr_led: Number of leds to set.
         :type nr_led: byte
-        :param led_arr: Array containing tuples r,g,b for each neopixel. 
+        :param led_arr: Array containing r,g,b for each neopixel. 
         :param write: If True write the output to the NeoPixels. Defaults to True.
         :type write: bool
         """

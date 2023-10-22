@@ -10,7 +10,7 @@ from bluepad import BluePad
 bp=BluePad(Port.A)
 
 bp.neopixel_init(24,12) # set 24 pixel NeoPixel on pin GPIO12
-bp.neopixel_fill(30,0,0)
+bp.neopixel_fill((30,0,0))
 wait(300)
 bp.neopixel_zero()
 wait(300)
@@ -21,7 +21,7 @@ for x in range(1000):
     i+=1
     lednr=i%24
     c=i%20
-    q=bp.neopixel_set_multi(lednr,3,[c,(c+6)%20,(c+12)%20]*3)
+    q=bp.neopixel_set_multi(lednr,3,[c*3,3*((c+6)%20),3*((c+12)%20)]*3)
     (gplx,gply,gprx,gpry,buttons,dpad)=q
     if 'Y' in bp.btns_pressed(buttons,nintendo=True):
         lednr+=8
@@ -47,5 +47,8 @@ while 1:
     hub.display.pixel(y1,x1,70)
     btns=bp.btns_pressed(buttons,nintendo=True)
     if len(btns)>0:
-        print(btns)
+        print('buttons:',btns)
+    btns=bp.dpad_pressed(dpad,nintendo=True)
+    if len(btns)>0:
+        print('dpad   :',btns)
     wait(20)
