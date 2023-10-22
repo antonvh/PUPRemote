@@ -1,3 +1,4 @@
+from pybricks.hubs import PrimeHub
 from pybricks.pupdevices import Motor, ColorSensor, UltrasonicSensor, ForceSensor
 from pybricks.parameters import Button, Color, Direction, Port, Side, Stop
 from pybricks.robotics import DriveBase
@@ -16,10 +17,17 @@ wait(300)
 
 st=StopWatch()
 i=0
-for x in range(100):
+for x in range(1000):
     i+=1
-    i%=20
-    q=bp.neopixel_set_multi(i%5,3,[i,(i+6)%20,(i+12)%20]*3)
+    lednr=i%24
+    c=i%20
+    q=bp.neopixel_set_multi(lednr,3,[c,(c+6)%20,(c+12)%20]*3)
+    (gplx,gply,gprx,gpry,buttons,dpad)=q
+    if 'Y' in bp.btns_pressed(buttons,nintendo=True):
+        lednr+=8
+        print('Y')
+print(st.time())
+
     
 print(st.time())
 st=StopWatch()
@@ -37,4 +45,7 @@ while 1:
     x1=(512+gprx)//210
     y1=(512+gpry)//210
     hub.display.pixel(y1,x1,70)
+    btns=bp.btns_pressed(buttons,nintendo=True)
+    if len(btns)>0:
+        print(btns)
     wait(20)

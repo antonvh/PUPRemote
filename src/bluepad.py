@@ -18,6 +18,8 @@ class BluePad:
     Class for using LMS-ESP32 running BluePad32 LPF2 firmware. Defines methods for reading
     connected Bluetooth gamepad (such as PS4 or Nintendo Switch) and for driving NeoPixels and Servo motors connected
     to the LMS-ESP32 board.
+    Flash the LMS-ESP32 board with BluePad32 LPF2 for PyBricks projects from 
+    https://firmware.antonsmindstorms.com/.
    
     :param port: The port to which the LMS-ESp32 running BluePad32 is connected.
     :type port: Port (Example: Port.A)
@@ -141,7 +143,7 @@ class BluePad:
         return r
 
 
-    def neopixel_set(self,led_nr,color,write=True):
+    def neopixel_set(self,led_nr,r,g,b,write=True):
         """
         Sets single NeoPixel at position led_nr with color=(r,g,b).
 
@@ -160,7 +162,7 @@ class BluePad:
             print("error neopixel_set: led_nr larger than number of leds!")
             r=None
         else:
-            leds[3:6]=color
+            leds[3:6]=[r,g,b]
             r=self.prh.call('gpled',*leds)
         self.cur_mode=0
         return r
@@ -173,7 +175,7 @@ class BluePad:
         :type start_led: byte
         :param nr_led: Number of leds to set.
         :type nr_led: byte
-        :param led_arr: Array containing tuples (r,g,b) for each neopixel. Led dimension must correspond to 
+        :param led_arr: Array containing tuples r,g,b for each neopixel. 
         :param write: If True write the output to the NeoPixels. Defaults to True.
         :type write: bool
         """
@@ -210,5 +212,4 @@ class BluePad:
         r=self.prh.call('gpsrv',*s)
         cur_mode=1
         return r
-
 
