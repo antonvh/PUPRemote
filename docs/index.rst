@@ -32,9 +32,9 @@ PUPRemote API documentation
 BluePad API documentation
 -------------------------
 
-This is a small wrapper library to use with the `BluePad32 LPF2 for Pybricks firmware`<https://firmware.antonsmindstorms.com/>`_. It uses the PUPRemote library to communicate with the firmware of the LMS-ESP32 acting like
+This is a small wrapper library to use with the `BluePad32 LPF2 for Pybricks firmware <https://firmware.antonsmindstorms.com/>`_. It uses the PUPRemote library to communicate with the firmware of the LMS-ESP32 acting like
 a Lego sensor and supporting reading the gamepad and driving NeoPixels and Servo's that are connected to the LMS-ESP32 board. 
-This firmware is based on the nice `Bluepad32 for Arduino<https://github.com/ricardoquesada/bluepad32/blob/main/docs/plat_arduino.md>` library made by Ricardo Quesada.
+This firmware is based on the nice `Bluepad32 for Arduino <https://github.com/ricardoquesada/bluepad32/blob/main/docs/plat_arduino.md>`_ library made by Ricardo Quesada.
 
 .. automodule:: bluepad
     :members:
