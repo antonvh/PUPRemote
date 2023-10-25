@@ -182,7 +182,7 @@ class PUPRemoteHub(PUPRemote):
                 mode, 
                 tuple(payl + b'\x00'*( size - len(payl)))
                 )
-            wait(wait_ms)
+            wait(wait_ms+size*1.5)
 
         data = self.pup_device.read(mode)
         size=len(data)

@@ -16,13 +16,9 @@ for i in range(100):
     print(
         i,p.call('smalldata', *data)
         )
-    wait(20)
-    
 
 for i in range(100):
     data = [x+i for x in range(32)]
     print(
         i, p.call('largedata', *data)
         )
-    # More bytes need more time. Reduce this below 45 to make the connection crash
-    wait(45)
