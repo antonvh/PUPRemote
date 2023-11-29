@@ -138,6 +138,10 @@ class PUPRemoteHub(PUPRemote):
     :param power: Set to True if the PUPRemoteSensor needs 8V power on M+ wire.
     :type power: bool
     """
+    
+    def _int8_to_uint8(self,arr):
+        return [((i+128)&0xff)-128 for i in arr]
+
 
     def __init__(self, port):
         super().__init__()
@@ -180,7 +184,7 @@ class PUPRemoteHub(PUPRemote):
                 )
             self.pup_device.write(
                 mode, 
-                tuple(payl + b'\x00'*( size - len(payl)))
+                self._int8_to_uint8(tuple(payl + b'\x00'*( size - len(payl))))
                 )
             wait(wait_ms+size*1.5)
 
