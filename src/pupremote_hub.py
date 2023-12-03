@@ -36,11 +36,13 @@ class PUPRemote:
     and their formats. Contains encoding/decoding functions.
     """
 
-    def __init__(self):
+    def __init__(self, max_packet_size=MAX_PKT):
         # Store commands, size and format
         self.commands = []
         # Store mode names (commands) to look up their index
         self.modes = {}
+        # Optional override for max packet size for Pybricks compatibility
+        self.max_packet_size = max_packet_size
 
     def add_channel(self, mode_name: str, to_hub_fmt: str =""):
         """
@@ -80,7 +82,7 @@ class PUPRemote:
 
         """
         if to_hub_fmt == "repr" or from_hub_fmt == "repr":
-            msg_size = MAX_PKT
+            msg_size = self.max_packet_size
         else:
             size_to_hub_fmt = struct.calcsize(to_hub_fmt)
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
@@ -135,16 +137,16 @@ class PUPRemoteHub(PUPRemote):
 
     :param port: The port to which the PUPRemoteSensor is connected.
     :type port: Port (Example: Port.A)
-    :param power: Set to True if the PUPRemoteSensor needs 8V power on M+ wire.
-    :type power: bool
+    :param max_packet_size: Set to 16 for Pybricks compatibility, defaults to 32.
+    :type max_packet_size: int
     """
     
     def _int8_to_uint8(self,arr):
         return [((i+128)&0xff)-128 for i in arr]
 
 
-    def __init__(self, port):
-        super().__init__()
+    def __init__(self, port, max_packet_size=MAX_PKT):
+        super().__init__(max_packet_size)
         self.port = port
         try:
             self.pup_device = PUPDevice(port)
