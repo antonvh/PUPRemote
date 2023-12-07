@@ -15,6 +15,9 @@ Use this library to communicate as a Powered UP (PUP) Device with LEGO smart hub
 - import pupremote.py
 - import demo_pybricks_inventorhub or _technichub
 
+## Compatibility with Pybricks
+If you get checksum errors it could be due to a known issue with 32 byte packet size in Pybricks. Pass max_packet_size=16 when instantiating PUPRemoteHub and PUPRemoteSensor classes to work around this issue.
+
 ## Contributing
 
 Please fork and streamline the protocol. There are also some TODOs below you can help with. 

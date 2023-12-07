@@ -51,7 +51,7 @@ def default_cmd_callback(size, buf):
 
 
 class LPF2(object):
-    def __init__(self, modes, sensor_id=WeDo_Ultrasonic, timer=4, freq=5, debug=False):
+    def __init__(self, modes, sensor_id=WeDo_Ultrasonic, timer=4, freq=5, debug=False, max_packet_size=MAX_PKT):
         self.txTimer = timer
         self.modes = modes
         self.current_mode = 0
@@ -65,6 +65,7 @@ class LPF2(object):
         self.cmd_call_back = default_cmd_callback
         self.last_nack = 0
         self.debug = debug
+        self.max_packet_size = max_packet_size
 
     @staticmethod
     def mode(
@@ -131,7 +132,7 @@ class LPF2(object):
             bin_data = struct.pack(format[data_type], data)
         elif isinstance(data, str):
             # String. Convert to bytes of max size.
-            bin_data = bytes(data, "UTF-8")[:MAX_PKT]
+            bin_data = bytes(data, "UTF-8")[:self.max_packet_size]
         elif isinstance(data, bytes):
             bin_data = data
         elif isinstance(data, bytearray):
@@ -222,7 +223,7 @@ class LPF2(object):
                     if ck == self.readchar():
                         return buf
                     else:
-                        print("Checksum error")
+                        print("Checksum error. Try reducing max_packet_size to 16 if using Pybricks.")
 
 
     def writeIt(self, array):
@@ -283,7 +284,7 @@ class LPF2(object):
 
     def padString(self, string, num, startNum):
         reply = bytearray(string, "UTF-8")
-        reply = reply[:MAX_PKT]
+        reply = reply[:self.max_packet_size]
         exp = __num_bits(len(reply) - 1)
         reply = reply + b"\x00" * (2**exp - len(string))
         exp = exp << 3
