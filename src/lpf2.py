@@ -408,38 +408,11 @@ class ESP_LPF2(LPF2):
         )
 
 
-class Prime_LPF2(LPF2):
-    def init(self):
-        self.tx = machine.Pin(self.txPin, machine.Pin.OUT)
-        self.rx = machine.Pin(self.rxPin, machine.Pin.IN)
-        self.tx.value(0)
-        utime.sleep_ms(500)
-        self.tx.value(1)
-        self.uart = machine.UART(baudrate=2400, bits=8, parity=None, stop=1)
-        self.writeIt(b"\x00")
-
-
-class EV3_LPF2(LPF2):
-    def init(self):
-        self.uart.init(baudrate=2400, bits=8, parity=None, stop=1)
-        self.writeIt(b"\x00")
-
-    def defineVers(self, hardware, software):
-        return bytearray([])
-
-
 class OpenMV_LPF2(LPF2):
     uartchannel = 3
 
-    def __init__(self, modes, sensor_id=WeDo_Ultrasonic, timer=4, freq=5):
-        from uos import dupterm
-
-        dupterm(None, 2)
-        super().__init__(modes, sensor_id, timer, freq)
-
     def write_tx_pin(self, value, sleep=500):
         from pyb import Pin
-
         txpin = Pin("P4", Pin.OUT_PP)
         txpin.value(value)
         utime.sleep_ms(sleep)
