@@ -4,8 +4,9 @@ __license__ = "GPL"
 __version__ = "0.1"
 __status__ = "Beta"
 
-# This is a wrapper around the methods of the BluePad class, so that these methods can be used from Blocks PyBricks.
+# This code is a wrapper around the methods of the BluePad class, so that these methods can be used from Blocks PyBricks.
 
+from pybricks.parameters import Port
 from bluepad import BluePad
 
 # define global vraiables to store Bluepad objects
