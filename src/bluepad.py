@@ -55,7 +55,7 @@ class BluePad:
     def btns_pressed(self,btns,nintendo=False):
         """
         Decodes the buttons pressed and converts the buttons to a string
-        containing the pressed buttons ['X','O','[]','Δ']
+        containing the pressed buttons ['X','O','#','^']
 
         :param btns: The word read from the gamepad containing the binary encodeing of pressed buttons
         : type btns: Word
@@ -67,7 +67,7 @@ class BluePad:
         if nintendo:
             btn_val=['B','A','Y','X','L','R','ZL','ZR']
         else:
-            btn_val=['X','O','[]','V']
+            btn_val=['X','O','#','^']
         btns_string=[j  for i,j in zip(bits_btns,btn_val) if i]
         return btns_string
 
