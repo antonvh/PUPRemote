@@ -12,7 +12,7 @@ from bluepad import BluePad
 # define global vraiables to store Bluepad objects
 _bp = None
 _nintendo = False
-lx, ly, rx, ry, btns, dpad = [None] * 6
+lx, ly, rx, ry, _btns, _dpad = [None] * 6
 
 # the functions below will be imported from the PyBricks Blocks language
 def bp_init(port_letter,nintendo=True):
@@ -23,8 +23,8 @@ def bp_init(port_letter,nintendo=True):
     _nintendo = nintendo
 
 def gamepad():
-    global lx, ly, rx, ry, btns, dpad
-    lx, ly, rx, ry, btns, dpad = _bp.gamepad()
+    global lx, ly, rx, ry, _btns, _dpad
+    lx, ly, rx, ry, _btns, _dpad = _bp.gamepad()
 
 def lpad_x():
     return lx
@@ -39,10 +39,17 @@ def rpad_y():
     return ry
 
 def btns():
-    return _bp.btns_pressed(btns,_nintendo)
+    b=_bp.btns_pressed(_btns,_nintendo)
+    if 'ZL'in b:
+        zl_pos=b.index('ZL')
+        b[zl_pos]='1'
+    if 'ZR' in b:
+        zr_pos=b.index('ZR')
+        b[zr_pos]='2'
+    return ''.join(b)
 
 def dpad():
-    return _bp.dpad_pressed(dpad,_nintendo)
+    return ''.join(_bp.dpad_pressed(_dpad,_nintendo))
 
 def neopixel_init(nr_leds,pin):
     _bp.neopixel_init(nr_leds,pin)
