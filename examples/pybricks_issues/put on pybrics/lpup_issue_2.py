@@ -30,28 +30,27 @@ p.add_command('lg_data',from_hub_fmt="32B", to_hub_fmt="32B")
 ## Now call the lms-esp32 over lpup to test our commands
 ### ISSUE 2: It seems that pybricks only *writes* the first 7 bits of a byte
 
-# Unsigned bytes can represent 128, but not -10
-# Expecting to get (1, 2, 246, 128)
-print("\nPybricks hubs only send 7 bytes on mode write")
-data = (1, 2, -10, 128)
-answer = p.call('ub', *data)
-print('Sent:', data, '\nGot:', answer)
-
-# Signed bytes can represent -10, but not 128
-# Expecting to get (1, 2, -10, -127)
-data = (1, 2, -10, 128)
-answer = p.call('sb', *data)
-print('\nSent:', data, '\nGot:', answer)
-
 # This arrives as b'}~\x7f\x7f' (or ['7d', '7e', '7f', '7f']) :((
 p.pup_device.write(1, tuple(b'\x7d\x7e\x7f\x80'))
 
-# *Reading* all 8 bits is no problem, however
+# This arrives as (127, 127, 129, 129). 
+# Even with a workaround, we can't send 128.
+p.pup_device.write(1, (127, 128, -128, -127))
+
+# We have this workaround now.
+def _int8_to_uint8(arr):
+    return [((i+128)&0xff)-128 for i in arr]
+
+# This arrives as (127, 129, 129, 255)
+p.pup_device.write(1, _int8_to_uint8((127, 128, 129, 255)) )
+
+# *Reading* all uint8 is no problem, however
 tgt_values = list(range(256))
 print("\nReading all possible byte values... [0,1, ... ,255]")
 for i in range(500):
     n = p.call('sweep')
-    wait(10)
+    wait(10) # Give esp some time to update sweep value
     if n in tgt_values:
+        # Remove the value from the list
         tgt_values.pop(tgt_values.index(n))
 print('\nBy now this list should be empty:', tgt_values)
