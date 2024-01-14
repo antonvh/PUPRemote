@@ -44,7 +44,7 @@ def scale_stick(val, min_val, max_val, deadzone=25):
         val = 0
     return (float(val + 512) / 1024) * (max_val - min_val) + min_val
 
-steer.run_until_stalled(-200, Stop.COAST, 40)
+steer.run_until_stalled(-150)
 steer.reset_angle(-200)
 steer.run_target(300, 0)
 
