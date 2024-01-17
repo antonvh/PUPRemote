@@ -22,6 +22,9 @@ In UartRemote\src\ in UartRemote.h change:
 
 The voltage input on the M5Stamp Pico is connected to a 5V regulator, but is fed with only 3.3V from the LMS-ESP32. Consequently, we need to bypass the regulator on the M5Stamp Pico by connecting the 5V inut to the 3v3 pin.
 
+![image](https://github.com/antonvh/PUPRemote/assets/51531682/64f869b5-82a2-4e52-b2cc-2529371309b3)
+
+
 ## Programming
 ### LMS-ESP32 MicroPython
 On the LMS-ESP32 we initialize a UartRemote connection to the external BluePad module and a PUPRemote connection to the PyBricks hub:
