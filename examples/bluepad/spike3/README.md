@@ -9,6 +9,12 @@ This is a template SPIKEv3 block program that allows you to read:
 - the status of the buttons (button)
 - the status of the dpad (dpad)
 
+
+![image](https://github.com/antonvh/PUPRemote/assets/51531682/1c5ceb8f-6049-4a44-bed5-5a8ec795ffe0)
+
 You can use these variables in your own program. the values get updated every time you call the `dpad` function in your main loop of the program.
+
+![image](https://github.com/antonvh/PUPRemote/assets/51531682/8c165b6a-9cc7-4647-8d25-39db9bff441b)
+
 ## Block Pixel example
 This example show a pixel on the SPIKE 5x5 matrix corresponding to the position of the joysticks on the gamepad
