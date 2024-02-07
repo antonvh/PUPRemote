@@ -5,7 +5,7 @@ from pybricks.robotics import DriveBase
 from pybricks.tools import wait, StopWatch
 from pupremote import PUPRemoteHub
 
-buttons={'y':(8,[4,0],'C#4/16'),'g':(16,[0,4],'E3/16'),'r':(64,[4,4],'A4/16'),'b':(32,[0,0],'E4/16')}
+buttons={'y':(8,[4,0],'C#4/16'),'g':(16,[0,4],'E3/16'),'b':(32,[0,0],'E4/16'),'r':(64,[4,4],'A4/16')}
 
 
 hub = PrimeHub()
@@ -18,9 +18,10 @@ p.add_command('tresh','H','H')
 p.call('tresh',400)
 while True:
     btns=p.call('touch')
+    
     pressed=[]
-    for b in buttons:
-        pressed.append(b if btns&buttons[b][0]>0 else '.')
+    for c in 'ygbr':
+        pressed.append(c if btns&buttons[c][0]>0 else '.')
     print(pressed)
     hub.display.off()
     for col in pressed:
