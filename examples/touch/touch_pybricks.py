@@ -5,17 +5,27 @@ from pybricks.robotics import DriveBase
 from pybricks.tools import wait, StopWatch
 from pupremote import PUPRemoteHub
 
+buttons={'y':(8,[4,0],'C#4/16'),'g':(16,[0,4],'E3/16'),'r':(64,[4,4],'A4/16'),'b':(32,[0,0],'E4/16')}
+
+
 hub = PrimeHub()
 hub.display.off()
 p=PUPRemoteHub(Port.A)
-p.add_command('touch','10B')
+p.add_command('touch','H')
+p.add_command('val','4H')
+p.add_command('tresh','H','H')
 
+p.call('tresh',400)
 while True:
-    buttons=p.call('touch')
-    print(buttons)
-    for i,b in enumerate(buttons):
-        # light pixel on row, column when button is touched
-        r=i%5
-        c=i//5
-        hub.display.pixel(r,c,b*100)
-    wait(20)
+    btns=p.call('touch')
+    pressed=[]
+    for b in buttons:
+        pressed.append(b if btns&buttons[b][0]>0 else '.')
+    print(pressed)
+    hub.display.off()
+    for col in pressed:
+        if col!='.':
+            hub.display.pixel(*buttons[col][1],100)
+    vals=p.call('val')
+    print(','.join(["%4d"%v for v in vals]))
+    
