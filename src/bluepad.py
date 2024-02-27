@@ -58,7 +58,7 @@ class BluePad:
         containing the pressed buttons ['X','O','#','^']
 
         :param btns: The word read from the gamepad containing the binary encodeing of pressed buttons
-        : type btns: Word
+        :type btns: Word
         :param nintendo: Indicates that a nintendo gamepad is used.
         :return: String with pressed buttons
         """  
@@ -77,7 +77,7 @@ class BluePad:
         containing the pressed buttons ['L','R','U','D']
 
         :param btns: The word read from the gamepad containing the binary encoding of pressed dpad-buttons
-        : type btns: Word
+        :type btns: Word
 
         :return: String with pressed dpad-buttons
         """  
