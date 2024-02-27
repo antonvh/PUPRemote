@@ -409,12 +409,21 @@ class ESP_LPF2(LPF2):
 
 
 class OpenMV_LPF2(LPF2):
-    uartchannel = 3
-
+    
+    def __init__(self, *args, **kwargs):
+        import sys
+        if "RT1060" in sys.implementation[2]:
+            self.uartchannel = 1
+            from machine import Pin
+            self.txpin = Pin("P4", Pin.OUT, Pin.PULL_DOWN)
+        else: # We're on H7 or earlier
+            from pyb import Pin
+            self.txpin = Pin("P4", Pin.OUT_PP)
+            self.uartchannel = 3
+        super().__init__(*args, **kwargs)
+        
     def write_tx_pin(self, value, sleep=500):
-        from pyb import Pin
-        txpin = Pin("P4", Pin.OUT_PP)
-        txpin.value(value)
+        self.txpin.value(value)
         utime.sleep_ms(sleep)
 
     def slow_uart(self):
