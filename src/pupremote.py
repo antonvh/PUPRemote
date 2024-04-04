@@ -41,7 +41,7 @@ except ImportError:
 
 
 
-MAX_PKT     = const(32)
+MAX_PKT     = const(16)
 
 #: OpenMV board platform type
 OPENMV      = const(0)
@@ -182,7 +182,7 @@ class PUPRemoteSensor(PUPRemote):
     :type power: bool
     :param platform: Set to ESP32 or OPENMV, defaults to ESP32.
     :type platform: int
-    :param max_packet_size: Set to 16 for Pybricks compatibility, defaults to 32.
+    :param max_packet_size: Set to max 32 bytes of payload, defaults to 16 for Pybricks compatibility.
     :type max_packet_size: int
     """
 
@@ -191,7 +191,7 @@ class PUPRemoteSensor(PUPRemote):
     except:
         pass
 
-    def __init__(self, sensor_id=1, power=False, platform=ESP32, max_packet_size=MAX_PKT):
+    def __init__(self, sensor_id=SPIKE_ULTRASONIC, power=False, platform=ESP32, max_packet_size=MAX_PKT):
         super().__init__(max_packet_size)
         self.connected = False
         self.power = power

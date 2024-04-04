@@ -6,7 +6,7 @@ from pybricks.tools import wait
 from micropython import const
 
 
-MAX_PKT     = const(32)
+MAX_PKT     = const(16)
 #: OpenMV board platform type
 OPENMV      = const(0)
 #: LMS-ESP32 board platform type
