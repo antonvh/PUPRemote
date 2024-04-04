@@ -4,35 +4,44 @@ import machine
 import struct
 import utime
 import binascii
+from micropython import const
 
-MAX_PKT = 32
+MAX_PKT = const(32)
 
-BYTE_NACK = 0x02
-BYTE_ACK = 0x04
-CMD_Type = 0x40  # @, set sensor type command
-CMD_Select = 0x43  #  C, sets modes on the fly
-CMD_Mode = 0x49  # I, set mode type command
-CMD_Baud = 0x52  # R, set the transmission baud rate
-CMD_Vers = 0x5F  # _,  set the version number
-CMD_ModeInfo = 0x80  # name command
-CMD_Data = 0xC0  # data command
-CMD_EXT_MODE = 0x6
-EXT_MODE_0 = 0x00
-EXT_MODE_8 = 0x08  # only used for extended mode > 7
-CMD_LLL_SHIFT = 3
+BYTE_NACK = const(0x02)
+BYTE_ACK = const(0x04)
+CMD_Type = const(0x40)  # @, set sensor type command
+CMD_Select = const(0x43)  #  C, sets modes on the fly
+CMD_Mode = const(0x49)  # I, set mode type command
+CMD_Baud = const(0x52)  # R, set the transmission baud rate
+CMD_Vers = const(0x5F)  # _,  set the version number
+CMD_ModeInfo = const(0x80)  # name command
+CMD_Data = const(0xC0)  # data command
+CMD_EXT_MODE = const(0x6)
+EXT_MODE_0 = const(0x00)
+EXT_MODE_8 = const(0x08)  # only used for extended mode > 7
+CMD_LLL_SHIFT = const(3)
 
-LENGTH_1 = 0x00
+NAME = const(0x0)
+RAW = const(0x1)
+Pct = const(0x2)
+SI = const(0x3)
+SYM = const(0x4)
+FCT = const(0x5)
+FMT = const(0x80)
 
-NAME, RAW, Pct, SI, SYM, FCT, FMT = 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x80
-DATA8, DATA16, DATA32, DATAF = 0, 1, 2, 3  # Data type codes
-ABSOLUTE, RELATIVE, DISCRETE = 16, 8, 4
-WeDo_Ultrasonic, SPIKE_Color, SPIKE_Ultrasonic = 35, 61, 62
-Ev3_Utrasonic = 34
+DATA8 = const(0)
+DATA16 = const(1)
+DATA32 = const(2)
+DATAF = const(3)
 
-length = [1, 2, 4]
-format = ["B", "H", "I", "f"]
+ABSOLUTE = const(16)
+RELATIVE = const(8)
+DISCRETE = const(4)
 
-HEARTBEAT_PERIOD = 200  # time of inactivity after which we reset sensor
+STRUCT_FMT = ("B", "H", "I", "f")
+
+HEARTBEAT_PERIOD = const(200)  # time of inactivity after which we reset sensor
 
 def __num_bits(x):
     # Return the number of bits required to represent x
@@ -43,26 +52,13 @@ def __num_bits(x):
     return n
 
 
-def default_cmd_callback(size, buf):
-    print("received command")
-    print("size=", size)
-    print("len=", len(buf))
-    print("data=", binascii.hexlify(buf))
-
-
 class LPF2(object):
-    def __init__(self, modes, sensor_id=WeDo_Ultrasonic, timer=4, freq=5, debug=False, max_packet_size=MAX_PKT):
-        self.txTimer = timer
+    def __init__(self, modes, sensor_id=62, debug=False, max_packet_size=MAX_PKT):
         self.modes = modes
         self.current_mode = 0
         self.sensor_id = sensor_id
         self.connected = False
-        # self.payload = bytearray([])
         self.payloads = {}
-        self.freq = freq
-        self.oldbuffer = bytes([])
-        self.textBuffer = bytearray(b"\x00" * 32)
-        self.cmd_call_back = default_cmd_callback
         self.last_nack = 0
         self.debug = debug
         self.max_packet_size = max_packet_size
@@ -74,9 +70,9 @@ class LPF2(object):
         data_type=DATA8,
         writable=0,
         format="3.0",
-        raw=[0, 100],
-        percent=[0, 100],
-        SI=[0, 100],
+        raw_range=[0, 100],
+        percent_range=[0, 100],
+        si_range=[0, 100],
         symbol="",
         functionmap=[ABSOLUTE, ABSOLUTE],
         view=True,
@@ -87,19 +83,19 @@ class LPF2(object):
         # Find the power of 2 that is greater than the length of the data
         # -1 because of the header byte. # Really?
         bit_size = __num_bits( total_data_size-1 )
-        fred = [
+        mode_list = [
             name,           # 0
             [size, data_type, int(fig), int(dec)], # 1
-            raw,            # 2
-            percent,        # 3
-            SI,             # 4
+            raw_range,            # 2
+            percent_range,        # 3
+            si_range,             # 4
             symbol,         # 5
             functionmap,    # 6
             view,           # 7
             total_data_size,# 8
             bit_size        # 9
         ]
-        return fred
+        return mode_list
 
     def write_tx_pin(self, value, sleep=500):
         tx = machine.Pin(self.tx_pin_nr, machine.Pin.OUT)
@@ -116,27 +112,23 @@ class LPF2(object):
             self.uartChannel, baudrate=2400, rx=self.rxPin, tx=self.txPin, timeout=5
         )
 
-    # define own call back
-    def set_call_back(self, cb):
-        self.cmd_call_back = cb
-
     # -------- Payload definition
 
     def load_payload(self, data, data_type = DATA8, mode = None):
         if mode is None:
             mode = self.current_mode
-        if isinstance(data, list):
-            # We have a list of integers. Pack them as bytes.
-            bin_data = struct.pack("%d" % len(data) + format[data_type], *data)
-        elif isinstance(data, float) or isinstance(data, int):
-            bin_data = struct.pack(format[data_type], data)
-        elif isinstance(data, str):
-            # String. Convert to bytes of max size.
-            bin_data = bytes(data, "UTF-8")[:self.max_packet_size]
-        elif isinstance(data, bytes):
+        if isinstance(data, bytes):
             bin_data = data
         elif isinstance(data, bytearray):
             bin_data = data
+        elif isinstance(data, list):
+            # We have a list of integers. Pack them as bytes.
+            bin_data = struct.pack("%d" % len(data) + STRUCT_FMT[data_type], *data)
+        elif isinstance(data, float) or isinstance(data, int):
+            bin_data = struct.pack(STRUCT_FMT[data_type], data)
+        elif isinstance(data, str):
+            # String. Convert to bytes of max size.
+            bin_data = bytes(data, "UTF-8")[:self.max_packet_size]
         else:
             raise ValueError("Wrong data type: %s" % type(data))
 
@@ -165,10 +157,9 @@ class LPF2(object):
 
     def readchar(self):
         c = self.uart.read(1)
-        cbyte = ord(c) if c else -1
         if self.debug:
-            print("c= 0x%02X" % cbyte)
-        return cbyte
+            print("c= 0x%02X" % ord(c) if c else -1)
+        return ord(c) if c else -1
 
     def heartbeat(self):
         if (utime.ticks_ms() - self.last_nack) > HEARTBEAT_PERIOD:
@@ -256,18 +247,6 @@ class LPF2(object):
     def addChksm(self, array):
         return array + self.calc_cksm(array).to_bytes(1,'little')
 
-    # -----  Init and close
-
-    def init(self):
-        self.write_tx_pin(0, 500)
-        self.write_tx_pin(1, 0)
-        self.slow_uart()
-        self.writeIt(b"\x00")
-
-    def close(self):
-        # self.uart.deinit()
-        self.send_timer.deinit()
-
     # ---- settup definitions
 
     def setType(self, sensorType):
@@ -334,7 +313,6 @@ class LPF2(object):
                 views = views + 1
 
             # Initialize the payload for this mode
-
             self.load_payload(b"\x00" * mode[8], mode=i)
 
         views = (views - 1) & 0xFF
@@ -353,12 +331,13 @@ class LPF2(object):
 
     def initialize(self):
         self.connected = False
-        # self.send_timer = machine.Timer(-1)  # default is 200 ms
-        # self.period=int(1000/self.freq)
-        self.init()
+        self.write_tx_pin(0, 500)
+        self.write_tx_pin(1, 0)
+        self.slow_uart()
+        self.writeIt(b"\x00")
         self.writeIt(
             self.setType(self.sensor_id)
-        )  # set sensor_id to 35 (WeDo Ultrasonic) 61 (Spike color), 62 (Spike ultrasonic)
+        ) 
         self.writeIt(self.defineModes())  # tell how many modes
         self.writeIt(self.defineBaud(115200))
         self.writeIt(self.defineVers(2, 2))
@@ -377,13 +356,9 @@ class LPF2(object):
         # Reset Serial to High Speed
         if self.connected:
             self.write_tx_pin(0, 10)
-
             # Change baudrate
             self.fast_uart()
             self.load_payload(b'\x00')
-
-            # start callback  - MAKE SURE YOU RESTART THE CHIP EVERY TIME (CMD D) to kill previous callbacks running
-            # self.send_timer.init(period=self.period, mode=machine.Timer.PERIODIC, callback= self.hubCallback)
         return
 
 
@@ -409,7 +384,6 @@ class ESP_LPF2(LPF2):
 
 
 class OpenMV_LPF2(LPF2):
-    
     def __init__(self, *args, **kwargs):
         import sys
         if "RT1060" in sys.implementation[2]:

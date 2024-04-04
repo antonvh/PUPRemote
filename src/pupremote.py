@@ -204,7 +204,6 @@ class PUPRemoteSensor(PUPRemote):
             self.lpup = self.LPF2.ESP_LPF2([], sensor_id=sensor_id, max_packet_size=max_packet_size)
         elif platform == OPENMV:
             self.lpup = self.LPF2.OpenMV_LPF2([], sensor_id=sensor_id, max_packet_size=max_packet_size)
-        # self.lpup.set_call_back(self.call_back)
 
     def add_command(
         self,
