@@ -149,23 +149,43 @@ class LPF2(object):
 
         self.payloads[mode] = payload
 
-    def send_payload(self, array, data_type = DATA8):
-        self.load_payload(array, data_type)
-        self.writeIt(self.payloads[self.current_mode])
+    def send_payload(self, data=None, data_type=DATA8):
+        """
+        Convert bytes of data to a proper LPF2 payload,
+        save it to the payload of the current mode,
+        and write it to the hub. If there is no data, just
+        send current payload.
+        """
+        if not (data == None):
+            self.load_payload(data, data_type)
+        if self.connected:
+            self.writeIt(self.payloads[self.current_mode])
+        else:
+            if self.debug:
+                print("Write payload, but not connected.")
+
 
     # ----- comm stuff
 
     def readchar(self):
         c = self.uart.read(1)
-        if self.debug:
-            print("c= 0x%02X" % ord(c) if c else -1)
-        return ord(c) if c else -1
+        if self.debug: print(c)
+        if c == None:
+            return -1
+        else:
+            return ord(c)
 
     def heartbeat(self):
-        if (utime.ticks_ms() - self.last_nack) > HEARTBEAT_PERIOD:
-            # Reinitalize the port, have not heard from the hub in a while.
-            self.last_nack = utime.ticks_ms()
+        if not self.connected:
+            print("Heartbeat, but not connected. Initializing.")
             self.initialize()
+            return
+
+        if (utime.ticks_ms() - self.last_nack) > HEARTBEAT_PERIOD:
+            print("Heartbeat, connected, but hub is silent. Re-initializing.")
+            # self.last_nack = utime.ticks_ms()
+            self.initialize()
+            return
 
         b = self.readchar()  # Read in any heartbeat or command bytes
         if b > 0:  # There is data, let's see what it is.
@@ -219,7 +239,7 @@ class LPF2(object):
 
     def writeIt(self, array):
         if self.debug:
-            print(binascii.hexlify(array))
+            print("WriteIt:", binascii.hexlify(array))
         return self.uart.write(array)
 
     def waitFor(self, char, timeout=2):
@@ -231,7 +251,8 @@ class LPF2(object):
             currenttime = utime.time()
             if self.uart.any() > 0:
                 data = self.uart.read(1)
-                # print("received",data)
+                if self.debug:
+                    print("WaitFor:", char, ", got:", data)
                 if data == char:
                     status = True
                     break
@@ -330,14 +351,12 @@ class LPF2(object):
     # -----   Start everything up
 
     def initialize(self):
+        # self.debug = True
         self.connected = False
-        self.write_tx_pin(0, 500)
-        self.write_tx_pin(1, 0)
+
         self.slow_uart()
         self.writeIt(b"\x00")
-        self.writeIt(
-            self.setType(self.sensor_id)
-        ) 
+        self.writeIt(self.setType(self.sensor_id))
         self.writeIt(self.defineModes())  # tell how many modes
         self.writeIt(self.defineBaud(115200))
         self.writeIt(self.defineVers(2, 2))
@@ -348,18 +367,18 @@ class LPF2(object):
             utime.sleep_ms(5)
 
         self.writeIt(b"\x04")  # ACK
-        # Check for ACK reply
-        self.connected = self.waitFor(b"\x04")
-        print("Successfully connected to hub" if self.connected else "Failed to connect to hub")
-        self.last_nack = utime.ticks_ms()
+        self.connected = self.waitFor(b"\x04") #Ack
 
-        # Reset Serial to High Speed
         if self.connected:
+            self.last_nack = utime.ticks_ms()
+            print("Successfully connected to hub")
             self.write_tx_pin(0, 10)
             # Change baudrate
             self.fast_uart()
             self.load_payload(b'\x00')
-        return
+        else:
+            print("Failed to connect to hub")
+            self.write_tx_pin(0, 0)
 
 
 class ESP_LPF2(LPF2):
@@ -390,12 +409,13 @@ class OpenMV_LPF2(LPF2):
             self.uartchannel = 1
             from machine import Pin
             self.txpin = Pin("P4", Pin.OUT, Pin.PULL_DOWN)
+            self.rxpin = Pin("P5", Pin.IN, Pin.PULL_DOWN)
         else: # We're on H7 or earlier
             from pyb import Pin
             self.txpin = Pin("P4", Pin.OUT_PP)
             self.uartchannel = 3
         super().__init__(*args, **kwargs)
-        
+
     def write_tx_pin(self, value, sleep=500):
         self.txpin.value(value)
         utime.sleep_ms(sleep)

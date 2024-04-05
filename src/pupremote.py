@@ -283,10 +283,10 @@ class PUPRemoteSensor(PUPRemote):
                     self.commands[mode][TO_HUB_FORMAT],
                     *result
                     )
-                self.lpup.send_payload(pl)
+                self.lpup.send_payload(data=pl)
         else:
             # No callback. Just write the stored data from self.update_channel()
-            self.lpup.writeIt(self.lpup.payloads[mode])
+            self.lpup.send_payload()
 
         return self.lpup.connected
 
@@ -337,9 +337,9 @@ class PUPRemoteHub(PUPRemote):
             i.e. when you don't pass any arguments, the read will happen immediately.
         :type wait_ms: int
         """
-    
+
         mode = self.modes[mode_name]
-        size = self.commands[mode][SIZE] 
+        size = self.commands[mode][SIZE]
         # Dummy read action to work around mode setting bug in Pybricks beta 2.2.0b8
         # Also check if a sensor or sensor emulator is connected.abs
         try:
@@ -355,7 +355,7 @@ class PUPRemoteHub(PUPRemote):
                 *argv
                 )
             self.pup_device.write(
-                mode, 
+                mode,
                 self._int8_to_uint8(tuple(payl + b'\x00'*( size - len(payl))))
                 )
             wait(wait_ms+size*1.5)
@@ -367,7 +367,7 @@ class PUPRemoteHub(PUPRemote):
             self.commands[mode][TO_HUB_FORMAT],
             raw_data)
         # Convert tuple size 1 to single value
-        if len(result)==1: 
+        if len(result)==1:
             return result[0]
         else:
             return result
