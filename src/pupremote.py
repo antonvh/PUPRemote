@@ -176,7 +176,7 @@ class PUPRemoteSensor(PUPRemote):
     so the buck converter on the SPIKE-OPENMV or LMS-ESP32 board side can supply high
     currents (op to 1700mA) to your appliances.
 
-    :param sensor_id: The id of the sensor of the sensor to emulate, defaults to 1.
+    :param sensor_id: The id of the sensor of the sensor to emulate, defaults to 62.
     :type sensor_id: int
     :param power: Set to True if the PUPRemoteHub needs 8V power on M+ wire, defaults to False.
     :type power: bool
@@ -291,6 +291,12 @@ class PUPRemoteSensor(PUPRemote):
         return self.lpup.connected
 
     def update_channel(self, mode_name: str, *argv):
+        """Update values in 'sensor' memory, so the hub can retrieve them with call().
+        This is simpler than defining a function that is called remotely from the hub.
+
+        :param mode_name: mode name you defined when you used `add_channel()`
+        :type mode_name: str
+        """
         mode = self.modes[mode_name]
 
         pl = self.encode(
