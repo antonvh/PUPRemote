@@ -94,6 +94,7 @@ class LPF2(object):
             self.BOARD = OPENMV
             if uart_n == None:
                 self.UART_N = 3
+            print("OpenMV H7 defaults loaded")
         else:
             # default to pure ESP32 micorpython
             self.BOARD = ESP32
@@ -250,12 +251,12 @@ class LPF2(object):
 
     def heartbeat(self):
         if not self.connected:
-            print("Heartbeat, but not connected. Initializing.")
+            print("Checking heartbeat, but not connected. Initializing.")
             self.initialize()
             return
 
         if (utime.ticks_ms() - self.last_nack) > HEARTBEAT_PERIOD:
-            print("Heartbeat, connected, but hub is silent. Re-initializing.")
+            print("Checking heartbeat, but line is dead. Re-initializing.")
             self.connected = False
             self.initialize()
             return
@@ -315,18 +316,6 @@ class LPF2(object):
         if self.debug:
             print("WriteIt:", binascii.hexlify(array))
         return self.uart.write(array)
-
-    def waitFor(self, char, timeout=2000):
-        timeout += utime.ticks_ms()
-        status = False
-        while utime.ticks_ms() < timeout:
-            utime.sleep_ms(5)
-            if self.uart.any() > 0:
-                data = self.uart.read(1)
-                if data == char:
-                    status = True
-                    break
-        return status
 
     @staticmethod
     def calc_cksm(array):
@@ -435,7 +424,19 @@ class LPF2(object):
             utime.sleep_ms(5)
 
         self.writeIt(b"\x04")  # ACK
-        self.connected = self.waitFor(b"\x04")  # Ack
+        end = utime.ticks_ms() + 2500
+        while utime.ticks_ms() < end:  # Wait for ack
+            data = self.uart.read(1)
+            if data == None:
+                continue
+            elif data == b"\x04":
+                self.connected = True
+                self.uart.deinit()  # We're done with slow UART
+                break
+            else:
+                # We're getting crap data, there's probably no hub.
+                self.uart.read(self.uart.any())  # Flush
+                break
 
         if self.connected:
             self.last_nack = utime.ticks_ms()
