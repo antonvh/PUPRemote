@@ -1,10 +1,20 @@
 # LPF2 class allows communication between LEGO SPIKE Prime and third party devices.
-
 import machine
 import struct
 import utime
 import binascii
 from micropython import const
+from sys import implementation
+
+# OpenMV board platform type
+# sys.implementation[2]: OPENMV4P-STM32H743
+OPENMV = const(0)
+# LMS-ESP32 board platform type
+# sys.implementation[2]: ESP32 module (lvgl,ulab,spiram) with ESP32
+ESP32 = const(1)
+# OpenMV RT board platform type
+# sys.implementation[2]: OpenMV IMXRT1060-MIMXRT1062DVJ6A
+OPENMVRT = const(2)
 
 MAX_PKT = const(32)
 
@@ -43,6 +53,7 @@ STRUCT_FMT = ("B", "H", "I", "f")
 
 HEARTBEAT_PERIOD = const(200)  # time of inactivity after which we reset sensor
 
+
 def __num_bits(x):
     # Return the number of bits required to represent x
     n = 0
@@ -53,7 +64,16 @@ def __num_bits(x):
 
 
 class LPF2(object):
-    def __init__(self, modes, sensor_id=62, debug=False, max_packet_size=MAX_PKT):
+    def __init__(
+        self,
+        modes,
+        sensor_id=62,
+        debug=False,
+        max_packet_size=MAX_PKT,
+        rx=None,
+        tx=None,
+        uart_n=None,
+    ):
         self.modes = modes
         self.current_mode = 0
         self.sensor_id = sensor_id
@@ -62,6 +82,28 @@ class LPF2(object):
         self.last_nack = 0
         self.debug = debug
         self.max_packet_size = max_packet_size
+        self.UART_N = uart_n
+        self.TX_PIN_N = tx
+        self.RX_PIN_N = rx
+        if "RT1060" in implementation[2]:
+            self.BOARD = OPENMVRT
+            if uart_n == None:
+                self.UART_N = 1
+            print("OpenMV RT defaults loaded")
+        elif "OPENMV4P" in implementation[2]:
+            self.BOARD = OPENMV
+            if uart_n == None:
+                self.UART_N = 3
+        else:
+            # default to pure ESP32 micorpython
+            self.BOARD = ESP32
+            if tx == None:
+                print("LMS-ESP32 defaults loaded")
+                self.TX_PIN_N = 19
+            if rx == None:
+                self.RX_PIN_N = 18
+            if uart_n == None:
+                self.UART_N = 2
 
     @staticmethod
     def mode(
@@ -79,42 +121,73 @@ class LPF2(object):
     ):
         fig, dec = format.split(".")
         functionmap = [ABSOLUTE, writable]
-        total_data_size = size * 2**data_type # Byte size of data set.
+        total_data_size = size * 2**data_type  # Byte size of data set.
         # Find the power of 2 that is greater than the length of the data
         # -1 because of the header byte. # Really?
-        bit_size = __num_bits( total_data_size-1 )
+        bit_size = __num_bits(total_data_size - 1)
         mode_list = [
-            name,           # 0
-            [size, data_type, int(fig), int(dec)], # 1
-            raw_range,            # 2
-            percent_range,        # 3
-            si_range,             # 4
-            symbol,         # 5
-            functionmap,    # 6
-            view,           # 7
-            total_data_size,# 8
-            bit_size        # 9
+            name,  # 0
+            [size, data_type, int(fig), int(dec)],  # 1
+            raw_range,  # 2
+            percent_range,  # 3
+            si_range,  # 4
+            symbol,  # 5
+            functionmap,  # 6
+            view,  # 7
+            total_data_size,  # 8
+            bit_size,  # 9
         ]
         return mode_list
 
-    def write_tx_pin(self, value, sleep=500):
-        tx = machine.Pin(self.tx_pin_nr, machine.Pin.OUT)
-        tx.value(value)
-        utime.sleep_ms(sleep)
+    def slow_uart(self):
+        if self.BOARD == ESP32:
+            tx_pin = machine.Pin(self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN)
+            tx_pin.value(0)
+            utime.sleep_ms(500)
+            tx_pin.value(1)
+            self.uart = machine.UART(
+                self.UART_N,
+                baudrate=2400,
+                rx=self.RX_PIN_N,
+                tx=self.TX_PIN_N,
+            )
+
+        elif self.BOARD == OPENMVRT:
+            tx_pin = machine.Pin("P4", machine.Pin.OUT, machine.Pin.PULL_DOWN)
+            tx_pin.value(0)
+            utime.sleep_ms(500)
+            tx_pin.value(1)
+            self.uart = machine.UART(self.UART_N, 2400)
+
+        elif self.BOARD == OPENMV:
+            import pyb
+
+            tx_pin = pyb.Pin("P4", pyb.Pin.OUT_PP)
+            tx_pin.value(0)
+            utime.sleep_ms(500)
+            tx_pin.value(1)
+            self.uart = pyb.UART(self.UART_N, 2400)
 
     def fast_uart(self):
-        self.uart = machine.UART(
-            self.uartchannel, baudrate=115200, rx=self.rx_pin_nr, tx=self.tx_pin_nr
-        )
+        if self.BOARD == ESP32:
+            self.uart = machine.UART(
+                self.UART_N,
+                baudrate=115200,
+                rx=self.RX_PIN_N,
+                tx=self.TX_PIN_N,
+            )
 
-    def slow_uart(self):
-        self.uart = machine.UART(
-            self.uartChannel, baudrate=2400, rx=self.rxPin, tx=self.txPin, timeout=5
-        )
+        elif self.BOARD == OPENMVRT:
+            self.uart = machine.UART(self.UART_N, 115200)
+
+        elif self.BOARD == OPENMV:
+            import pyb
+
+            self.uart = pyb.UART(self.UART_N, 115200)
 
     # -------- Payload definition
 
-    def load_payload(self, data, data_type = DATA8, mode = None):
+    def load_payload(self, data, data_type=DATA8, mode=None):
         if mode is None:
             mode = self.current_mode
         if isinstance(data, bytes):
@@ -128,7 +201,7 @@ class LPF2(object):
             bin_data = struct.pack(STRUCT_FMT[data_type], data)
         elif isinstance(data, str):
             # String. Convert to bytes of max size.
-            bin_data = bytes(data, "UTF-8")[:self.max_packet_size]
+            bin_data = bytes(data, "UTF-8")[: self.max_packet_size]
         else:
             raise ValueError("Wrong data type: %s" % type(data))
 
@@ -143,9 +216,9 @@ class LPF2(object):
         payload[0] = CMD_Data | (bit << CMD_LLL_SHIFT) | mode
         cksm ^= payload[0]
         for i in range(len(bin_data)):
-            payload[i+1] = bin_data[i]
+            payload[i + 1] = bin_data[i]
             cksm ^= bin_data[i]
-        payload[-1] = cksm # No need to checksum zero bytes.
+        payload[-1] = cksm  # No need to checksum zero bytes.
 
         self.payloads[mode] = payload
 
@@ -164,12 +237,12 @@ class LPF2(object):
             if self.debug:
                 print("Write payload, but not connected.")
 
-
     # ----- comm stuff
 
     def readchar(self):
         c = self.uart.read(1)
-        if self.debug: print(c)
+        if self.debug:
+            print(c)
         if c == None:
             return -1
         else:
@@ -183,7 +256,7 @@ class LPF2(object):
 
         if (utime.ticks_ms() - self.last_nack) > HEARTBEAT_PERIOD:
             print("Heartbeat, connected, but hub is silent. Re-initializing.")
-            # self.last_nack = utime.ticks_ms()
+            self.connected = False
             self.initialize()
             return
 
@@ -191,14 +264,14 @@ class LPF2(object):
         if b > 0:  # There is data, let's see what it is.
             if b == BYTE_NACK:
                 # Regular heartbeat pulse from the hub. We have to reply with data.
-                self.last_nack = utime.ticks_ms() # reset heartbeat timer
+                self.last_nack = utime.ticks_ms()  # reset heartbeat timer
 
                 # Now send the payload
                 self.writeIt(self.payloads[self.current_mode])
                 # print("payload", self.payloads[self.current_mode])
 
             elif b == CMD_Select:
-                self.last_nack = utime.ticks_ms() # reset heartbeat timer
+                self.last_nack = utime.ticks_ms()  # reset heartbeat timer
                 # The hub is asking us to change mode.
                 mode = self.readchar()
                 cksm = self.readchar()
@@ -207,11 +280,11 @@ class LPF2(object):
                     self.current_mode = mode
 
             elif b == 0x46:
-                self.last_nack = utime.ticks_ms() # reset heartbeat timer
+                self.last_nack = utime.ticks_ms()  # reset heartbeat timer
                 # Data from hub to sensor should read 0x46, 0x00, 0xb9
                 # print("cmd recv")
                 ext_mode = self.readchar()  # 0x00 or 0x08
-                cksm = self.readchar()      # 0xb9
+                cksm = self.readchar()  # 0xb9
 
                 if cksm == 0xFF ^ 0x46 ^ ext_mode:
                     b = self.readchar()  # CMD_Data | LENGTH | MODE
@@ -234,25 +307,22 @@ class LPF2(object):
                     if ck == self.readchar():
                         return buf
                     else:
-                        print("Checksum error. Try reducing max_packet_size to 16 if using Pybricks.")
-
+                        print(
+                            "Checksum error. Try reducing max_packet_size to 16 if using Pybricks."
+                        )
 
     def writeIt(self, array):
         if self.debug:
             print("WriteIt:", binascii.hexlify(array))
         return self.uart.write(array)
 
-    def waitFor(self, char, timeout=2):
-        starttime = utime.time()
-        currenttime = starttime
+    def waitFor(self, char, timeout=2000):
+        timeout += utime.ticks_ms()
         status = False
-        while (currenttime - starttime) < timeout:
+        while utime.ticks_ms() < timeout:
             utime.sleep_ms(5)
-            currenttime = utime.time()
             if self.uart.any() > 0:
                 data = self.uart.read(1)
-                if self.debug:
-                    print("WaitFor:", char, ", got:", data)
                 if data == char:
                     status = True
                     break
@@ -266,7 +336,7 @@ class LPF2(object):
         return chksm
 
     def addChksm(self, array):
-        return array + self.calc_cksm(array).to_bytes(1,'little')
+        return array + self.calc_cksm(array).to_bytes(1, "little")
 
     # ---- settup definitions
 
@@ -284,7 +354,7 @@ class LPF2(object):
 
     def padString(self, string, num, startNum):
         reply = bytearray(string, "UTF-8")
-        reply = reply[:self.max_packet_size]
+        reply = reply[: self.max_packet_size]
         exp = __num_bits(len(reply) - 1)
         reply = reply + b"\x00" * (2**exp - len(string))
         exp = exp << 3
@@ -352,9 +422,6 @@ class LPF2(object):
 
     def initialize(self):
         # self.debug = True
-        self.connected = False
-        self.write_tx_pin(0, 500)
-        self.write_tx_pin(1, 0)
         self.slow_uart()
         self.writeIt(b"\x00")
         self.writeIt(self.setType(self.sensor_id))
@@ -368,60 +435,12 @@ class LPF2(object):
             utime.sleep_ms(5)
 
         self.writeIt(b"\x04")  # ACK
-        self.connected = self.waitFor(b"\x04") #Ack
+        self.connected = self.waitFor(b"\x04")  # Ack
 
         if self.connected:
             self.last_nack = utime.ticks_ms()
             print("Successfully connected to hub")
-            self.write_tx_pin(0, 10)
-            # Change baudrate
             self.fast_uart()
-            self.load_payload(b'\x00')
+            self.load_payload(b"\x00")
         else:
             print("Failed to connect to hub")
-            self.write_tx_pin(0, 0)
-
-
-class ESP_LPF2(LPF2):
-    tx_pin_nr = 19
-    rx_pin_nr = 18
-    uartchannel = 2
-
-    def write_tx_pin(self, value, sleep=500):
-        tx = machine.Pin(self.tx_pin_nr, machine.Pin.OUT)
-        tx.value(value)
-        utime.sleep_ms(sleep)
-
-    def slow_uart(self):
-        self.uart = machine.UART(
-            self.uartchannel, baudrate=2400, rx=self.rx_pin_nr, tx=self.tx_pin_nr
-        )
-
-    def fast_uart(self):
-        self.uart = machine.UART(
-            self.uartchannel, baudrate=115200, rx=self.rx_pin_nr, tx=self.tx_pin_nr
-        )
-
-
-class OpenMV_LPF2(LPF2):
-    def __init__(self, *args, **kwargs):
-        import sys
-        if "RT1060" in sys.implementation[2]:
-            self.uartchannel = 1
-            from machine import Pin
-            self.txpin = Pin("P4", Pin.OUT, Pin.PULL_DOWN)
-        else: # We're on H7 or earlier
-            from pyb import Pin
-            self.txpin = Pin("P4", Pin.OUT_PP)
-            self.uartchannel = 3
-        super().__init__(*args, **kwargs)
-
-    def write_tx_pin(self, value, sleep=500):
-        self.txpin.value(value)
-        utime.sleep_ms(sleep)
-
-    def slow_uart(self):
-        self.uart = machine.UART(self.uartchannel, 2400)
-
-    def fast_uart(self):
-        self.uart = machine.UART(self.uartchannel, 115200)

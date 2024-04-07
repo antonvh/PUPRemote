@@ -5,31 +5,41 @@ __version__ = "1.0.1"
 __status__ = "Production"
 
 try:
-    import ustruct as struct
-except ImportError:
-    import struct
-
-try:
     from pybricks.iodevices import PUPDevice
     from pybricks.tools import wait
-except:
+except ImportError:
     # We surely aren't on pybricks.
     class PUPDevice:
         def __init__(self, port):
             pass
+
         def read(self, mode):
             pass
+
         def write(self, mode, data):
             pass
+
     def wait(ms):
         pass
+
     # Pybricks has no time module, so here it's safe to import
     try:
         from time import ticks_ms
     except:
         from time import time as time_s
+
         def ticks_ms():
-            return round(time_s()*1000)
+            return round(time_s() * 1000)
+
+    # Pybricks does not need the lpf2 module, so here we import it
+    import lpf2
+    from lpf2 import OPENMV, ESP32, OPENMVRT
+
+try:
+    import ustruct as struct
+except ImportError:
+    # If ustruct is not available...
+    import struct
 
 try:
     from micropython import const
@@ -40,20 +50,14 @@ except ImportError:
         return x
 
 
-
-MAX_PKT     = const(16)
-
-#: OpenMV board platform type
-OPENMV      = const(0)
-#: LMS-ESP32 board platform type
-ESP32       = const(1)
+MAX_PKT = const(16)
 
 # Dictionary keys
-NAME        = const(0)
-SIZE        = const(1)
-TO_HUB_FORMAT      = const(2)
-FROM_HUB_FORMAT    = const(3)
-CALLABLE    = const(4)
+NAME = const(0)
+SIZE = const(1)
+TO_HUB_FORMAT = const(2)
+FROM_HUB_FORMAT = const(3)
+CALLABLE = const(4)
 
 #: WeDo Ultrasonic sensor id
 WEDO_ULTRASONIC = const(35)
@@ -84,7 +88,7 @@ class PUPRemote:
         # Optional override for max packet size for Pybricks compatibility
         self.max_packet_size = max_packet_size
 
-    def add_channel(self, mode_name: str, to_hub_fmt: str =""):
+    def add_channel(self, mode_name: str, to_hub_fmt: str = ""):
         """
         Define a data channel to read on the hub. Use this function with identical parameters on both
         the sensor and the hub. You can call a channel like a command, but to update the data
@@ -126,13 +130,13 @@ class PUPRemote:
         else:
             size_to_hub_fmt = struct.calcsize(to_hub_fmt)
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
-            msg_size = max(size_to_hub_fmt,size_from_hub_fmt )
+            msg_size = max(size_to_hub_fmt, size_from_hub_fmt)
 
         self.commands.append(
             {
-            NAME: mode_name,
-            TO_HUB_FORMAT: to_hub_fmt,
-            SIZE: msg_size,
+                NAME: mode_name,
+                TO_HUB_FORMAT: to_hub_fmt,
+                SIZE: msg_size,
             }
         )
         if command_type == CALLBACK:
@@ -140,18 +144,18 @@ class PUPRemote:
             # self.commands[-1][CALLABLE] = eval(mode_name)
 
         # Build a dictionary of mode names and their index
-        self.modes[mode_name] = len(self.commands)-1
+        self.modes[mode_name] = len(self.commands) - 1
 
     def decode(self, fmt: str, data: bytes):
         if fmt == "repr":
             # Remove trailing zero's (b'\x00') and eval the string
-            clean = bytearray( [c for c in data if c != 0] )
+            clean = bytearray([c for c in data if c != 0])
             if clean:
                 return (eval(clean),)
             else:
                 # Probably nothing left after stripping zero's
-                return ('',)
-            
+                return ("",)
+
         else:
             size = struct.calcsize(fmt)
             data = struct.unpack(fmt, data[:size])
@@ -186,12 +190,13 @@ class PUPRemoteSensor(PUPRemote):
     :type max_packet_size: int
     """
 
-    try:
-        import lpf2 as LPF2
-    except:
-        pass
-
-    def __init__(self, sensor_id=SPIKE_ULTRASONIC, power=False, platform=ESP32, max_packet_size=MAX_PKT):
+    def __init__(
+        self,
+        sensor_id=SPIKE_ULTRASONIC,
+        power=False,
+        max_packet_size=MAX_PKT,
+        **kwargs  # backward compatibility
+    ):
         super().__init__(max_packet_size)
         self.connected = False
         self.power = power
@@ -199,11 +204,7 @@ class PUPRemoteSensor(PUPRemote):
         self.last_heartbeat = ticks_ms()
         self.heartbeat_interval = 20
         self.max_packet_size = max_packet_size
-
-        if platform == ESP32:
-            self.lpup = self.LPF2.ESP_LPF2([], sensor_id=sensor_id, max_packet_size=max_packet_size)
-        elif platform == OPENMV:
-            self.lpup = self.LPF2.OpenMV_LPF2([], sensor_id=sensor_id, max_packet_size=max_packet_size)
+        self.lpup = lpf2.LPF2([], sensor_id=sensor_id, max_packet_size=max_packet_size)
 
     def add_command(
         self,
@@ -217,7 +218,7 @@ class PUPRemoteSensor(PUPRemote):
         if command_type == CALLBACK:
             self.commands[-1][CALLABLE] = eval(mode_name)
         if from_hub_fmt != "":
-            writeable = self.LPF2.ABSOLUTE
+            writeable = lpf2.ABSOLUTE
         max_mode_name_len = 5 if self.power else self.max_packet_size
         if len(mode_name) > max_mode_name_len:
             print(
@@ -234,11 +235,13 @@ class PUPRemoteSensor(PUPRemote):
         self.lpup.modes.append(
             self.lpup.mode(
                 mode_name,
-                self.commands[-1][SIZE], # This packet size of the last command we added (this one)
-                self.LPF2.DATA8,
-                writeable
-                )
+                self.commands[-1][
+                    SIZE
+                ],  # This packet size of the last command we added (this one)
+                lpf2.DATA8,
+                writeable,
             )
+        )
 
     def process(self):
         """
@@ -253,7 +256,7 @@ class PUPRemoteSensor(PUPRemote):
             return self.lpup.connected
         else:
             self.last_heartbeat = ticks_ms()
-            
+
         # Get data from the hub and return previously stored payloads
         data = self.lpup.heartbeat()
 
@@ -262,10 +265,7 @@ class PUPRemoteSensor(PUPRemote):
         if CALLABLE in self.commands[mode]:
             result = None
             if data is not None:
-                args = self.decode(
-                    self.commands[mode][FROM_HUB_FORMAT],
-                    data
-                    )
+                args = self.decode(self.commands[mode][FROM_HUB_FORMAT], data)
                 result = self.commands[mode][CALLABLE](*args)
 
             else:
@@ -275,14 +275,14 @@ class PUPRemoteSensor(PUPRemote):
                     # print("Error: function %s() needs arguments." % self.commands[mode][NAME])
                     pass
 
-            if result is not None: # Allow for 0
+            if result is not None:  # Allow for 0
                 if not isinstance(result, tuple):
                     result = (result,)
                 pl = self.encode(
                     self.commands[mode][SIZE],
                     self.commands[mode][TO_HUB_FORMAT],
                     *result
-                    )
+                )
                 self.lpup.send_payload(data=pl)
         else:
             # No callback. Just write the stored data from self.update_channel()
@@ -300,10 +300,8 @@ class PUPRemoteSensor(PUPRemote):
         mode = self.modes[mode_name]
 
         pl = self.encode(
-            self.commands[mode][SIZE],
-            self.commands[mode][TO_HUB_FORMAT],
-            *argv
-            )
+            self.commands[mode][SIZE], self.commands[mode][TO_HUB_FORMAT], *argv
+        )
         self.lpup.load_payload(pl, mode=mode)
 
 
@@ -318,8 +316,9 @@ class PUPRemoteHub(PUPRemote):
     :param max_packet_size: Set to 16 for Pybricks compatibility, defaults to 32.
     :type max_packet_size: int
     """
-    def _int8_to_uint8(self,arr):
-        return [((i+128)&0xff)-128 for i in arr]
+
+    def _int8_to_uint8(self, arr):
+        return [((i + 128) & 0xFF) - 128 for i in arr]
 
     def __init__(self, port, max_packet_size=MAX_PKT):
         super().__init__(max_packet_size)
@@ -355,26 +354,18 @@ class PUPRemoteHub(PUPRemote):
             return None
 
         if len(argv) > 0:
-            payl = self.encode(
-                size,
-                self.commands[mode][FROM_HUB_FORMAT],
-                *argv
-                )
+            payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
             self.pup_device.write(
-                mode,
-                self._int8_to_uint8(tuple(payl + b'\x00'*( size - len(payl))))
-                )
-            wait(wait_ms+size*1.5)
+                mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
+            )
+            wait(wait_ms + size * 1.5)
 
         data = self.pup_device.read(mode)
-        size=len(data)
-        raw_data = struct.pack('%db'%size,*data)
-        result = self.decode(
-            self.commands[mode][TO_HUB_FORMAT],
-            raw_data)
+        size = len(data)
+        raw_data = struct.pack("%db" % size, *data)
+        result = self.decode(self.commands[mode][TO_HUB_FORMAT], raw_data)
         # Convert tuple size 1 to single value
-        if len(result)==1:
+        if len(result) == 1:
             return result[0]
         else:
             return result
-
