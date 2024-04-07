@@ -353,7 +353,8 @@ class LPF2(object):
     def initialize(self):
         # self.debug = True
         self.connected = False
-
+        self.write_tx_pin(0, 500)
+        self.write_tx_pin(1, 0)
         self.slow_uart()
         self.writeIt(b"\x00")
         self.writeIt(self.setType(self.sensor_id))
@@ -409,7 +410,6 @@ class OpenMV_LPF2(LPF2):
             self.uartchannel = 1
             from machine import Pin
             self.txpin = Pin("P4", Pin.OUT, Pin.PULL_DOWN)
-            self.rxpin = Pin("P5", Pin.IN, Pin.PULL_DOWN)
         else: # We're on H7 or earlier
             from pyb import Pin
             self.txpin = Pin("P4", Pin.OUT_PP)
