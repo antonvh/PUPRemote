@@ -6,6 +6,10 @@ as a Powered UP (PUP) Device with LEGO smart hubs.
 It has a PUPRemote library that acts more like RPC (Remote Procedure Calling).
 The library is compatible with Pybricks, SPIKE2, and Robot Inventor.
 
+`pupremote.py` works on all platforms, also on Pybricks. However, for Pybricks, there 
+is also a smaller file, called `pupremote_hub.py` that only contains the `PUPRemoteHub` class.
+So on Pybricks, we suggest using `from pupremote_hub import PUPRemoteHub`
+
 Example
 -------
 Run this on OpenMV
