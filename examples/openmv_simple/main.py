@@ -12,7 +12,11 @@ def num(n):
     print(n)
     return 2*n
 
-p=PUPRemoteSensor()
+# Define our emulated sensor, ultrasonic by default.
+# power=True is needed for OpenMV RT. H7 can go without power, 
+# but it's a good idea to turn it on for displays and other shields.
+p=PUPRemoteSensor(power=True)
+
 # Send and receive any object with 'repr' encoding
 p.add_command('msg',"repr","repr")
 
