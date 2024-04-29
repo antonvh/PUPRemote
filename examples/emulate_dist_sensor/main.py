@@ -1,5 +1,4 @@
-# Run this file on lms-esp32 to emulate a distance sensor,
-# for the vl0x.
+# Trying to run this file on lms-esp32 to emulate a distance sensor, for the vl0x.
 # Definitions from https://github.com/maarten-pennings/Lego-Mindstorms/blob/main/ms4/faq.md#what-is-port-info-telling-me-about-modes
 
 from lpf2 import LPF2, DATA16, ABSOLUTE, DATA8
@@ -37,7 +36,7 @@ def mode_convert(lms_modes):
     for lms_mode in lms_modes:
         result.append(
             LPF2.mode(
-                name = lms_mode['name'],
+                name = lms_mode['name'].encode("UTF-8") + b'\x00' + lms_mode['capability'],
                 size = lms_mode['format']['datasets'],
                 data_type = lms_mode['format']['type'],
                 writable = 1 if lms_mode["map_out"] else 0,
@@ -52,20 +51,6 @@ def mode_convert(lms_modes):
         )
     return result
 
-pwr=b'\x00\x80\x00\x00\x00\x05\x04'
-mode0 = [b'DISTL'+pwr,[1,DATA16,5,1],[0,2400],[0,100],[0,240],'CM',[145,0],True,2,1]
-#mode0 = [b'LEV O'+pwr,[8,LPF2.DATA8,1,0],[-9,9],[-100,100],[-9,9],'PCT',[0x0,0x50],True,8,3]
-# 0x00 0x21 0x00 0x00 0x00 0x05 0x04
-mode1 = [b'DISTS'+pwr,[1,DATA16,4,1],[0,320],[0,100],[0,32],'CM',[241,0],True,2,1]
-#  0x00 0x00 0x00 0x24 0x00 0x00 0x00 0x05 0x04
-mode2 = [b'SINGL'+pwr,[1,DATA16,5,1],[0,2500],[0,100],[0,250],'   ',[144,0],True,16,4]
-#  0x00 0x00 0x22 0x00 0x00 0x00 0x05 0x04 0x00 0x00 0x00 0x00
-mode3 = [b'TRANS'+pwr,[1,DATA8,1,0],[0,2],[0,100],[0,2],'   ',[0x10,0x0],True,1,0]
-mode4 = [b'TRANS'+pwr,[1,DATA8,1,0],[0,2],[0,100],[0,2],'   ',[144,0x00],True,1,0]
-mode5 = [b'LIGHT'+pwr,[4,DATA8,3,0],[0,100],[0,100],[0,100],'PCT',[0x0,144],True,4,2]
-mode6 = [b'LIGHT'+pwr,[4,DATA8,3,0],[0,100],[0,100],[0,100],'PCT',[0x0,0x10],True,4,2]
-mode7 = [b'LIGHT'+pwr,[4,DATA8,3,0],[0,100],[0,100],[0,100],'PCT',[0x0,0x10],True,4,2]
-modes=[mode0,mode1,mode2,mode3,mode4,mode5,mode6,mode7]
 
 single_mode_ls = [LPF2.mode("GAMEPAD", 6, DATA16, format="5.0", symbol="XYBD", raw_range=(0.0, 512.0), 
                         percent_range=(0.0, 1024.0), si_range=(0.0, 512.0))]
@@ -73,18 +58,22 @@ single_mode_ls = [LPF2.mode("GAMEPAD", 6, DATA16, format="5.0", symbol="XYBD", r
 single_mode_ds = [LPF2.mode("DISTL", 1, DATA16, format="5.1", symbol="CM", raw_range=(0.0, 100.0), 
                         percent_range=(0.0, 250.0), si_range=(0.0, 2500.0), functionmap=[0,145])]
 
-#sensor_emu = LPF2(single_mode_ls, 61)
-#sensor_emu = LPF2(single_mode_ds, 62) #DOES NOT WORK
-#sensor_emu = LPF2(mode_convert(distance_sensor_modes), 62, debug=True)
-sensor_emu = LPF2(modes,sensor_id=62,debug=True)
+sensor_emu = LPF2(single_mode_ls, 61, debug=True) # Works, Pybricks, SPIKE3
 
-last_heartbeat = ticks_ms()
-heartbeat_interval = 20
+#sensor_emu = LPF2(single_mode_ds, 62, debug=True) #DOES NOT WORK, NEVER GETS ACK on mode def
+
+# Crash requires import machine;machine.reset()
+
+#sensor_emu = LPF2(mode_convert(distance_sensor_modes), 62, debug=True) # DOES NOT WORK, no ack
+
+# last_heartbeat = ticks_ms()
+# heartbeat_interval = 20
 
 while 1:
     sensor_emu.load_payload(time()%10)
     data_in = sensor_emu.heartbeat()
-    if data_in: print(data_in)
+    if data_in:
+        print(data_in)
 
 #     if ticks_ms() > last_heartbeat + heartbeat_interval:
 #         sensor_emu.heartbeat()

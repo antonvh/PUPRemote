@@ -156,9 +156,9 @@ class LPF2(object):
         ]
         return mode_list
 
-    def tx_low(self):
-        self.tx_pin.value(0)
-        utime.sleep_ms(500)
+    def wrt_tx_pin(self, val, wait):
+        self.tx_pin.value(val)
+        utime.sleep_ms(wait)
 
     def slow_uart(self):
         if self.BOARD == ESP32:
@@ -433,13 +433,16 @@ class LPF2(object):
     # -----   Start everything up
 
     def connect(self):
-        self.tx_low()
+        self.wrt_tx_pin(0, 450)
+        self.wrt_tx_pin(1, 0)
+        # self.fast_uart()
+        # self.write(b"\x04")
         self.slow_uart()
         self.write(b"\x00")
         self.write(self.setType(self.sensor_id))
         self.write(self.defineModes())  # tell how many modes
         self.write(self.defineBaud(115200))
-        self.write(self.defineVers(2, 2))
+        self.write(self.defineVers(1, 1))
         num = len(self.modes) - 1
         for mode in reversed(self.modes):
             self.setupMode(mode, num)
@@ -458,7 +461,7 @@ class LPF2(object):
                 continue
             elif data == BYTE_ACK:
                 self.connected = True
-                self.uart.deinit()  # We're done with slow UART
+                # self.uart.deinit()  # We're done with slow UART
                 break
             else:
                 utime.sleep_ms(5)
