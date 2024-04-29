@@ -117,7 +117,7 @@ class LPF2(object):
         name,
         size=1,
         data_type=DATA8,
-        writable=0,
+        writable=0, # Leaving this for bw compatibility
         format="3.0",
         raw_range=[0, 100],
         percent_range=[0, 100],
@@ -127,10 +127,9 @@ class LPF2(object):
         view=True,
     ):
         fig, dec = format.split(".")
-        functionmap = [ABSOLUTE, writable]
         total_data_size = size * 2**data_type  # Byte size of data set.
         # Find the power of 2 that is greater than the length of the data
-        # -1 because of the header byte. # Really?
+        # -1 because of the header byte.
         bit_size = __num_bits(total_data_size - 1)
         mode_list = [
             name,  # 0
@@ -194,9 +193,10 @@ class LPF2(object):
 
     # -------- Payload definition
 
-    def load_payload(self, data, data_type=DATA8, mode=None):
+    def load_payload(self, data, mode=None):
         if mode is None:
             mode = self.current_mode
+        data_type=self.modes[mode][1][1]
         if isinstance(data, bytes):
             bin_data = data
         elif isinstance(data, bytearray):
@@ -229,21 +229,23 @@ class LPF2(object):
 
         self.payloads[mode] = payload
 
-    def send_payload(self, data=None, data_type=DATA8):
+    def send_payload(self, data=None, mode=None):
         """
         Convert bytes of data to a proper LPF2 payload,
         save it to the payload of the current mode,
         and write it to the hub. If there is no data, just
         send current payload.
         """
-        if not (data == None):
-            self.load_payload(data, data_type)
-        if self.connected:
-            self.writeIt(self.payloads[self.current_mode])
-        else:
+        if not self.connected:
             if self.debug:
                 print("Write payload, but not connected.")
-
+            return
+        if mode is None:
+            mode = self.current_mode
+        if data is not None:
+            self.load_payload(data, mode)
+        self.writeIt(self.payloads[mode])
+        
     # ----- comm stuff
 
     def readchar(self):
@@ -272,11 +274,11 @@ class LPF2(object):
             if b == BYTE_NACK:
                 # Regular heartbeat pulse from the hub. We have to reply with data.
                 self.last_nack = utime.ticks_ms()  # reset heartbeat timer
-
-                # Now send the payload
-                self.writeIt(self.payloads[self.current_mode])
-                # print("payload", self.payloads[self.current_mode])
-
+                # Confirm extended mode 0
+                # self.writeIt(b'\x46\x00\xb9')
+                # Now send the current payload
+                self.send_payload()
+                
             elif b == CMD_Select:
                 self.last_nack = utime.ticks_ms()  # reset heartbeat timer
                 # The hub is asking us to change mode.
@@ -285,6 +287,7 @@ class LPF2(object):
                 # Calculate the checksum for two bytes.
                 if cksm == 0xFF ^ CMD_Select ^ mode:
                     self.current_mode = mode
+                    if self.debug: print(f"mode switched to {mode}")
 
             elif b == 0x46:
                 self.last_nack = utime.ticks_ms()  # reset heartbeat timer
@@ -296,10 +299,11 @@ class LPF2(object):
                 if cksm == 0xFF ^ 0x46 ^ ext_mode:
                     b = self.readchar()  # CMD_Data | LENGTH | MODE
 
-                    # Bitmask and then shift to get the size exponent of the data
+                    # Bitmask and then shift to get the LENGTH (=size exponent) of the data
                     size = 2 ** ((b & 0b111000) >> 3)
 
                     # Bitmask to get the mode number
+                    # TODO test if setting current mode is part of the protocol
                     self.current_mode = (b & 0b111) + ext_mode
 
                     # Keep track of the checksum while reading data
@@ -396,9 +400,8 @@ class LPF2(object):
         for i in range(len(self.modes)):
             mode = self.modes[i]
             if mode[7]:
-                views = views + 1
-
-            # Initialize the payload for this mode
+                views += 1
+            # Initialize empty payload for this mode
             self.load_payload(b"\x00" * mode[8], mode=i)
 
         views = (views - 1) & 0xFF
@@ -416,7 +419,6 @@ class LPF2(object):
     # -----   Start everything up
 
     def initialize(self):
-        # self.debug = True
         self.slow_uart()
         self.writeIt(b"\x00")
         self.writeIt(self.setType(self.sensor_id))
@@ -446,8 +448,7 @@ class LPF2(object):
 
         if self.connected:
             self.last_nack = utime.ticks_ms()
-            print("Successfully connected to hub")
+            print(f"Successfully connected to hub with senor id {self.sensor_id}")
             self.fast_uart()
-            self.load_payload(b"\x00")
         else:
             print("Failed to connect to hub")
