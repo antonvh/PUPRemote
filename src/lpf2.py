@@ -8,7 +8,6 @@ __status__ = "Production"
 import machine
 import struct
 import utime
-import binascii
 from micropython import const
 from sys import implementation
 
@@ -40,7 +39,7 @@ CMD_LLL_SHIFT = const(3)
 
 NAME = const(0x0)
 RAW = const(0x1)
-Pct = const(0x2)
+PCT = const(0x2)
 SI = const(0x3)
 SYM = const(0x4)
 FCT = const(0x5)
@@ -244,39 +243,46 @@ class LPF2(object):
             mode = self.current_mode
         if data is not None:
             self.load_payload(data, mode)
-        self.writeIt(self.payloads[mode])
+        self.write(self.payloads[mode])
         
     # ----- comm stuff
 
+    def flush(self):
+        return self.uart.read(self.uart.any())
+    
+    @staticmethod
+    def str_b(b):
+        return " ".join([hex(c) for c in b])
+    
     def readchar(self):
         c = self.uart.read(1)
-        if self.debug:
-            print(c)
         if c == None:
             return -1
         else:
+            if self.debug:
+                print(f"\033[91m {self.str_b(c)}\033[0m", end=" ")
             return ord(c)
 
     def heartbeat(self):
         if not self.connected:
             print("Checking heartbeat, but not connected. Initializing.")
-            self.initialize()
+            self.connect()
             return
 
         if (utime.ticks_ms() - self.last_nack) > HEARTBEAT_PERIOD:
             print("Checking heartbeat, but line is dead. Re-initializing.")
             self.connected = False
-            self.initialize()
+            self.connect()
             return
 
         b = self.readchar()  # Read in any heartbeat or command bytes
         if b > 0:  # There is data, let's see what it is.
             if b == BYTE_NACK:
-                # Regular heartbeat pulse from the hub. We have to reply with data.
+                # Regular heartbeat pulse from the hub.
                 self.last_nack = utime.ticks_ms()  # reset heartbeat timer
-                # Confirm extended mode 0
-                # self.writeIt(b'\x46\x00\xb9')
-                # Now send the current payload
+                # Confirm we're alive with data empty packet (extended mode 0)
+                self.write(b'\x46\x00\xb9')
+                # Resend latest data, just in case
                 self.send_payload()
                 
             elif b == CMD_Select:
@@ -287,12 +293,13 @@ class LPF2(object):
                 # Calculate the checksum for two bytes.
                 if cksm == 0xFF ^ CMD_Select ^ mode:
                     self.current_mode = mode
-                    if self.debug: print(f"mode switched to {mode}")
+                    self.send_payload()
+                    if self.debug: 
+                        print(f"Mode switched to {mode}")
 
             elif b == 0x46:
                 self.last_nack = utime.ticks_ms()  # reset heartbeat timer
                 # Data from hub to sensor should read 0x46, 0x00, 0xb9
-                # print("cmd recv")
                 ext_mode = self.readchar()  # 0x00 or 0x08
                 cksm = self.readchar()  # 0xb9
 
@@ -304,7 +311,7 @@ class LPF2(object):
 
                     # Bitmask to get the mode number
                     # TODO test if setting current mode is part of the protocol
-                    self.current_mode = (b & 0b111) + ext_mode
+                    wrt_mode = (b & 0b111) + ext_mode
 
                     # Keep track of the checksum while reading data
                     ck = 0xFF ^ b
@@ -321,10 +328,14 @@ class LPF2(object):
                         print(
                             "Checksum error. Try reducing max_packet_size to 16 if using Pybricks."
                         )
+            else:
+                if self.debug:
+                    buf = self.flush()
+                    print(f"Unhandled data from hub {hex(b)} {self.str_b(buf)}")
 
-    def writeIt(self, array):
+    def write(self, array):
         if self.debug:
-            print("WriteIt:", binascii.hexlify(array))
+            print("\n>> ", self.str_b(array))
         return self.uart.write(array)
 
     @staticmethod
@@ -408,47 +419,48 @@ class LPF2(object):
         return self.addChksm(bytearray([CMD_Mode, length, views]))
 
     def setupMode(self, mode, num):
-        self.writeIt(self.padString(mode[0], num, NAME))  # write name
-        self.writeIt(self.buildRange(mode[2], num, RAW))  # write RAW range
-        self.writeIt(self.buildRange(mode[3], num, Pct))  # write Percent range
-        self.writeIt(self.buildRange(mode[4], num, SI))  # write SI range
-        self.writeIt(self.padString(mode[5], num, SYM))  # write symbol
-        self.writeIt(self.buildFunctMap(mode[6], num, FCT))  # write Function Map
-        self.writeIt(self.buildFormat(mode[1], num, FMT))  # write format
+        self.write(self.padString(mode[0], num, NAME))  # write name
+        self.write(self.buildRange(mode[2], num, RAW))  # write RAW range
+        self.write(self.buildRange(mode[3], num, PCT))  # write Percent range
+        self.write(self.buildRange(mode[4], num, SI))  # write SI range
+        self.write(self.padString(mode[5], num, SYM))  # write symbol
+        self.write(self.buildFunctMap(mode[6], num, FCT))  # write Function Map
+        self.write(self.buildFormat(mode[1], num, FMT))  # write format
 
     # -----   Start everything up
 
-    def initialize(self):
+    def connect(self):
         self.slow_uart()
-        self.writeIt(b"\x00")
-        self.writeIt(self.setType(self.sensor_id))
-        self.writeIt(self.defineModes())  # tell how many modes
-        self.writeIt(self.defineBaud(115200))
-        self.writeIt(self.defineVers(2, 2))
+        self.write(b"\x00")
+        self.write(self.setType(self.sensor_id))
+        self.write(self.defineModes())  # tell how many modes
+        self.write(self.defineBaud(115200))
+        self.write(self.defineVers(2, 2))
         num = len(self.modes) - 1
         for mode in reversed(self.modes):
             self.setupMode(mode, num)
             num -= 1
             utime.sleep_ms(5)
 
-        self.writeIt(b"\x04")  # ACK
+        self.write(b"\x04")  # ACK
         end = utime.ticks_ms() + 2500
         while utime.ticks_ms() < end:  # Wait for ack
-            data = self.uart.read(1)
+            data = self.readchar()
             if data == None:
                 continue
-            elif data == b"\x04":
+            elif data == BYTE_ACK:
                 self.connected = True
                 self.uart.deinit()  # We're done with slow UART
                 break
             else:
-                # We're getting crap data, there's probably no hub.
-                self.uart.read(self.uart.any())  # Flush
-                break
+                utime.sleep_ms(5)
+                # We're getting crap data, on pybricks there's probably no hub.
+                # self.uart.read(self.uart.any())  # Flush
+                # break
 
         if self.connected:
             self.last_nack = utime.ticks_ms()
-            print(f"Successfully connected to hub with senor id {self.sensor_id}")
+            print(f"\nSuccessfully connected to hub with senor id {self.sensor_id}")
             self.fast_uart()
         else:
-            print("Failed to connect to hub")
+            print("\nFailed to connect to hub")
