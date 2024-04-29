@@ -27,22 +27,27 @@ BYTE_NACK = const(0x02)
 BYTE_ACK = const(0x04)
 CMD_Type = const(0x40)  # @, set sensor type command
 CMD_Select = const(0x43)  #  C, sets modes on the fly
-CMD_Mode = const(0x49)  # I, set mode type command
+CMD_MODES = const(0x41)  # I, set mode type command
 CMD_Baud = const(0x52)  # R, set the transmission baud rate
 CMD_Vers = const(0x5F)  # _,  set the version number
-CMD_ModeInfo = const(0x80)  # name command
-CMD_Data = const(0xC0)  # data command
+MSG_INFO = const(0x80)  # name command
+MSG_DATA = const(0xC0)  # data command
 CMD_EXT_MODE = const(0x6)
 EXT_MODE_0 = const(0x00)
 EXT_MODE_8 = const(0x08)  # only used for extended mode > 7
 CMD_LLL_SHIFT = const(3)
+MSG_INFO_PLUS8 = const(0x20)
+
+LEN_4 = const(2 << CMD_LLL_SHIFT)
+LEN_2 = const(1 << CMD_LLL_SHIFT)
+LEN_8 = const(3 << CMD_LLL_SHIFT)
 
 NAME = const(0x0)
 RAW = const(0x1)
 PCT = const(0x2)
 SI = const(0x3)
 SYM = const(0x4)
-FCT = const(0x5)
+FUNCTION_MAP = const(0x5)
 FMT = const(0x80)
 
 DATA8 = const(0)
@@ -50,9 +55,12 @@ DATA16 = const(1)
 DATA32 = const(2)
 DATAF = const(3)
 
-ABSOLUTE = const(16)
-RELATIVE = const(8)
-DISCRETE = const(4)
+# Input/Output Mapping flags, can be combined with |
+WITH_NULL = const(2**7)# Supports NULL value
+FUNC_2 = const(2**6) # Supports Functional Mapping 2.0+
+ABSOLUTE = const(16) # ABS (Absolute [min..max])
+RELATIVE = const(8) # REL (Relative [-1..1])
+DISCRETE = const(4) # DIS (Discrete [0, 1, 2, 3])
 
 STRUCT_FMT = ("B", "H", "I", "f")
 
@@ -94,11 +102,14 @@ class LPF2(object):
             self.BOARD = OPENMVRT
             if uart_n == None:
                 self.UART_N = 1
+            self.tx_pin = machine.Pin("P4", machine.Pin.OUT, machine.Pin.PULL_DOWN)
             print("OpenMV RT defaults loaded")
         elif "OPENMV4P" in implementation[2]:
             self.BOARD = OPENMV
             if uart_n == None:
                 self.UART_N = 3
+            import pyb
+            self.tx_pin = pyb.Pin("P4", pyb.Pin.OUT_PP)
             print("OpenMV H7 defaults loaded")
         else:
             # default to pure ESP32 micorpython
@@ -106,6 +117,7 @@ class LPF2(object):
             if tx == None:
                 print("LMS-ESP32 defaults loaded")
                 self.TX_PIN_N = 19
+            self.tx_pin = machine.Pin(self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN)
             if rx == None:
                 self.RX_PIN_N = 18
             if uart_n == None:
@@ -122,7 +134,7 @@ class LPF2(object):
         percent_range=[0, 100],
         si_range=[0, 100],
         symbol="",
-        functionmap=[ABSOLUTE, ABSOLUTE],
+        functionmap=[ABSOLUTE, ABSOLUTE], #[in (to hub), out (from hub)]
         view=True,
     ):
         fig, dec = format.split(".")
@@ -138,18 +150,18 @@ class LPF2(object):
             si_range,  # 4
             symbol,  # 5
             functionmap,  # 6
-            view,  # 7
+            view and functionmap[0],  # 7
             total_data_size,  # 8
             bit_size,  # 9
         ]
         return mode_list
 
+    def tx_low(self):
+        self.tx_pin.value(0)
+        utime.sleep_ms(500)
+
     def slow_uart(self):
         if self.BOARD == ESP32:
-            tx_pin = machine.Pin(self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN)
-            tx_pin.value(0)
-            utime.sleep_ms(500)
-            tx_pin.value(1)
             self.uart = machine.UART(
                 self.UART_N,
                 baudrate=2400,
@@ -158,19 +170,9 @@ class LPF2(object):
             )
 
         elif self.BOARD == OPENMVRT:
-            tx_pin = machine.Pin("P4", machine.Pin.OUT, machine.Pin.PULL_DOWN)
-            tx_pin.value(0)
-            utime.sleep_ms(500)
-            tx_pin.value(1)
             self.uart = machine.UART(self.UART_N, 2400)
 
         elif self.BOARD == OPENMV:
-            import pyb
-
-            tx_pin = pyb.Pin("P4", pyb.Pin.OUT_PP)
-            tx_pin.value(0)
-            utime.sleep_ms(500)
-            tx_pin.value(1)
             self.uart = pyb.UART(self.UART_N, 2400)
 
     def fast_uart(self):
@@ -219,7 +221,7 @@ class LPF2(object):
 
         payload = bytearray(2**bit + 2)
         cksm = 0xFF
-        payload[0] = CMD_Data | (bit << CMD_LLL_SHIFT) | mode
+        payload[0] = MSG_DATA | (bit << CMD_LLL_SHIFT) | mode
         cksm ^= payload[0]
         for i in range(len(bin_data)):
             payload[i + 1] = bin_data[i]
@@ -362,33 +364,31 @@ class LPF2(object):
         soft = software.to_bytes(4, "big")
         return self.addChksm(bytearray([CMD_Vers]) + hard + soft)
 
-    def padString(self, string, num, startNum):
-        reply = bytearray(string, "UTF-8")
-        reply = reply[: self.max_packet_size]
-        exp = __num_bits(len(reply) - 1)
-        reply = reply + b"\x00" * (2**exp - len(string))
-        exp = exp << 3
-        return self.addChksm(bytearray([CMD_ModeInfo | exp | num, startNum]) + reply)
+    def str_info(self, data, num, info_type):
+        if isinstance(data, str): # Convert and truncate
+            data = bytearray(data, "UTF-8")[:self.max_packet_size]
+        else: # Bytes, or bytearray. Just truncate.
+            data = bytearray(data)[:self.max_packet_size]
+        exp = __num_bits(len(data) - 1)
+        pl=bytearray(2**exp)
+        pl[:len(data)] = data
+        return self.addChksm(bytearray([MSG_INFO | exp << CMD_LLL_SHIFT | num, info_type]) + pl)
 
-    def buildFunctMap(self, mode, num, Type):
-        exp = 1 << CMD_LLL_SHIFT
-        mapType = mode[0]
-        mapOut = mode[1]
+    def buildFunctMap(self, fmap, num, info_type):
         return self.addChksm(
-            bytearray([CMD_ModeInfo | exp | num, Type, mapType, mapOut])
+            bytearray([MSG_INFO | LEN_2 | num, info_type, fmap[0], fmap[1]])
         )
 
-    def buildFormat(self, mode, num, Type):
-        exp = 2 << CMD_LLL_SHIFT
-        sampleSize = mode[0] & 0xFF
-        dataType = mode[1] & 0xFF
-        figures = mode[2] & 0xFF
-        decimals = mode[3] & 0xFF
+    def buildFormat(self, fmt, num, info_type):
+        sampleSize = fmt[0] & 0xFF
+        dataType = fmt[1] & 0xFF
+        figures = fmt[2] & 0xFF
+        decimals = fmt[3] & 0xFF
         return self.addChksm(
             bytearray(
                 [
-                    CMD_ModeInfo | exp | num,
-                    Type,
+                    MSG_INFO | LEN_4 | num,
+                    info_type,
                     sampleSize,
                     dataType,
                     figures,
@@ -402,34 +402,38 @@ class LPF2(object):
         minVal = struct.pack("<f", settings[0])
         maxVal = struct.pack("<f", settings[1])
         return self.addChksm(
-            bytearray([CMD_ModeInfo | exp | num, rangeType]) + minVal + maxVal
+            bytearray([MSG_INFO | exp | num, rangeType]) + minVal + maxVal
         )
 
     def defineModes(self):
-        length = (len(self.modes) - 1) & 0xFF
-        views = 0
-        for i in range(len(self.modes)):
-            mode = self.modes[i]
-            if mode[7]:
-                views += 1
-            # Initialize empty payload for this mode
-            self.load_payload(b"\x00" * mode[8], mode=i)
-
-        views = (views - 1) & 0xFF
-        return self.addChksm(bytearray([CMD_Mode, length, views]))
+        n_modes = len(self.modes) - 1
+        n_views = [m[7] for m in self.modes].count(True) - 1
+        # return self.addChksm(bytearray([CMD_Mode, n_modes, n_views]))
+        return self.addChksm(bytearray([
+            CMD_MODES | LEN_4, 
+            min(n_modes,7), 
+            min(n_views,7),
+            n_modes, 
+            n_views,
+            ]))
 
     def setupMode(self, mode, num):
-        self.write(self.padString(mode[0], num, NAME))  # write name
-        self.write(self.buildRange(mode[2], num, RAW))  # write RAW range
-        self.write(self.buildRange(mode[3], num, PCT))  # write Percent range
-        self.write(self.buildRange(mode[4], num, SI))  # write SI range
-        self.write(self.padString(mode[5], num, SYM))  # write symbol
-        self.write(self.buildFunctMap(mode[6], num, FCT))  # write Function Map
-        self.write(self.buildFormat(mode[1], num, FMT))  # write format
-
+        self.load_payload(b"\x00" * mode[8], num) # Store empty payload for this mode
+        plus_8 = 0x00
+        if num > 7:
+            num -= 8
+            plus_8 = MSG_INFO_PLUS8
+        self.write(self.str_info(mode[0], num, NAME | plus_8))  # write name
+        self.write(self.buildRange(mode[2], num, RAW | plus_8))  # write RAW range
+        self.write(self.buildRange(mode[3], num, PCT | plus_8))  # write Percent range
+        self.write(self.buildRange(mode[4], num, SI | plus_8))  # write SI range
+        self.write(self.str_info(mode[5], num, SYM | plus_8))  # write symbol
+        self.write(self.buildFunctMap(mode[6], num, FUNCTION_MAP  | plus_8))  # write Function Map
+        self.write(self.buildFormat(mode[1], num, FMT | plus_8))  # write format
     # -----   Start everything up
 
     def connect(self):
+        self.tx_low()
         self.slow_uart()
         self.write(b"\x00")
         self.write(self.setType(self.sensor_id))
@@ -440,7 +444,11 @@ class LPF2(object):
         for mode in reversed(self.modes):
             self.setupMode(mode, num)
             num -= 1
-            utime.sleep_ms(5)
+            utime.sleep_ms(20)
+        
+        # magic distance sensor data...
+        if self.sensor_id == 62:
+            self.write(bytearray([0xA0,0x08,0x00,0x60,0x00,0x42,0x0A,0x47,0x32,0x31,0x39,0x36,0x38,0x31,0x00,0x00,0x00,0x00,0x3D]))
 
         self.write(b"\x04")  # ACK
         end = utime.ticks_ms() + 2500
