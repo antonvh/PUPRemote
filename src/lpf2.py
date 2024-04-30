@@ -64,7 +64,7 @@ DISCRETE = const(4) # DIS (Discrete [0, 1, 2, 3])
 
 STRUCT_FMT = ("B", "H", "I", "f")
 
-HEARTBEAT_PERIOD = const(200)  # time of inactivity after which we reset sensor
+HEARTBEAT_PERIOD = const(1000)  # time of inactivity after which we reset sensor
 
 
 def __num_bits(x):
@@ -120,6 +120,7 @@ class LPF2(object):
             self.tx_pin = machine.Pin(self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN)
             if rx == None:
                 self.RX_PIN_N = 18
+            self.rx_pin = machine.Pin(self.RX_PIN_N, machine.Pin.IN)
             if uart_n == None:
                 self.UART_N = 2
 
@@ -157,6 +158,7 @@ class LPF2(object):
         return mode_list
 
     def wrt_tx_pin(self, val, wait):
+        self.tx_pin = machine.Pin(self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN)
         self.tx_pin.value(val)
         utime.sleep_ms(wait)
 
@@ -433,38 +435,51 @@ class LPF2(object):
     # -----   Start everything up
 
     def connect(self):
-        self.wrt_tx_pin(0, 450)
-        self.wrt_tx_pin(1, 0)
-        # self.fast_uart()
-        # self.write(b"\x04")
-        self.slow_uart()
-        self.write(b"\x00")
+        self.wrt_tx_pin(1, 5) # Say hello!
+        self.wrt_tx_pin(0, 0)
+        for i in range(30): # Wait for AOK
+            n=0
+            while self.rx_pin.value() == 1:
+                utime.sleep_ms(1)
+                if n>20: break
+                n+=1
+            if self.debug:
+                print(i, "falling after ms high:", n)
+            if i > 10 and (n>20 or n<15):
+                break
+            while self.rx_pin.value() == 0:
+                utime.sleep_ms(1)
+                # Wait until rise again
+                
+        self.fast_uart()     
+        utime.sleep_ms(5)
+        self.write(b"\x04")
+        # self.slow_uart()
+        # self.write(b"\x00")
         self.write(self.setType(self.sensor_id))
         self.write(self.defineModes())  # tell how many modes
         self.write(self.defineBaud(115200))
         self.write(self.defineVers(1, 1))
         num = len(self.modes) - 1
         for mode in reversed(self.modes):
+            utime.sleep_ms(20)
             self.setupMode(mode, num)
             num -= 1
-            utime.sleep_ms(20)
         
         # magic distance sensor data...
-        if self.sensor_id == 62:
-            self.write(bytearray([0xA0,0x08,0x00,0x60,0x00,0x42,0x0A,0x47,0x32,0x31,0x39,0x36,0x38,0x31,0x00,0x00,0x00,0x00,0x3D]))
+        # if self.sensor_id == 62:
+        #     utime.sleep_ms(20)
+        #     self.write(bytearray([0xA0,0x08,0x00,0x60,0x00,0x42,0x0A,0x47,0x32,0x31,0x39,0x36,0x38,0x31,0x00,0x00,0x00,0x00,0x3D]))
 
         self.write(b"\x04")  # ACK
         end = utime.ticks_ms() + 2500
         while utime.ticks_ms() < end:  # Wait for ack
             data = self.readchar()
-            if data == None:
-                continue
-            elif data == BYTE_ACK:
+            if data == BYTE_ACK:
                 self.connected = True
                 # self.uart.deinit()  # We're done with slow UART
                 break
-            else:
-                utime.sleep_ms(5)
+            utime.sleep_ms(5)
                 # We're getting crap data, on pybricks there's probably no hub.
                 # self.uart.read(self.uart.any())  # Flush
                 # break
@@ -472,6 +487,8 @@ class LPF2(object):
         if self.connected:
             self.last_nack = utime.ticks_ms()
             print(f"\nSuccessfully connected to hub with senor id {self.sensor_id}")
-            self.fast_uart()
+            utime.sleep_ms(20)
+            self.send_payload()
+            # self.fast_uart()
         else:
             print("\nFailed to connect to hub")
