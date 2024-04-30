@@ -435,9 +435,10 @@ class LPF2(object):
     # -----   Start everything up
 
     def connect(self):
+        fast_uart_hub = False
         self.wrt_tx_pin(1, 5) # Say hello!
         self.wrt_tx_pin(0, 0)
-        for i in range(30): # Wait for AOK
+        for i in range(25): # Wait for AOK
             n=0
             while self.rx_pin.value() == 1:
                 utime.sleep_ms(1)
@@ -445,17 +446,22 @@ class LPF2(object):
                 n+=1
             if self.debug:
                 print(i, "falling after ms high:", n)
-            if i > 10 and (n>20 or n<15):
+            if i > 10 and (n>21 or n<16):
+                print(n)
+                fast_uart_hub = True
                 break
             while self.rx_pin.value() == 0:
                 utime.sleep_ms(1)
                 # Wait until rise again
-                
-        self.fast_uart()     
-        utime.sleep_ms(5)
-        self.write(b"\x04")
-        # self.slow_uart()
-        # self.write(b"\x00")
+        
+        if fast_uart_hub:                
+            self.fast_uart()     
+            utime.sleep_ms(5)
+            self.write(b"\x04")
+            print(self.flush())
+        else:
+            self.slow_uart()
+            self.write(b"\x00")
         self.write(self.setType(self.sensor_id))
         self.write(self.defineModes())  # tell how many modes
         self.write(self.defineBaud(115200))
@@ -467,9 +473,9 @@ class LPF2(object):
             num -= 1
         
         # magic distance sensor data...
-        # if self.sensor_id == 62:
-        #     utime.sleep_ms(20)
-        #     self.write(bytearray([0xA0,0x08,0x00,0x60,0x00,0x42,0x0A,0x47,0x32,0x31,0x39,0x36,0x38,0x31,0x00,0x00,0x00,0x00,0x3D]))
+        if self.sensor_id == 62:
+            utime.sleep_ms(20)
+            self.write(bytearray([0xA0,0x08,0x00,0x60,0x00,0x42,0x0A,0x47,0x32,0x31,0x39,0x36,0x38,0x31,0x00,0x00,0x00,0x00,0x3D]))
 
         self.write(b"\x04")  # ACK
         end = utime.ticks_ms() + 2500
@@ -487,8 +493,7 @@ class LPF2(object):
         if self.connected:
             self.last_nack = utime.ticks_ms()
             print(f"\nSuccessfully connected to hub with senor id {self.sensor_id}")
-            utime.sleep_ms(20)
-            self.send_payload()
-            # self.fast_uart()
+            if not fast_uart_hub:
+                self.fast_uart()
         else:
             print("\nFailed to connect to hub")
