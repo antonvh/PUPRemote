@@ -102,14 +102,14 @@ class LPF2(object):
             self.BOARD = OPENMVRT
             if uart_n == None:
                 self.UART_N = 1
-            self.tx_pin = machine.Pin("P4", machine.Pin.OUT, machine.Pin.PULL_DOWN)
+            self.rx_pin = machine.Pin("P5", machine.Pin.IN)
             print("OpenMV RT defaults loaded")
         elif "OPENMV4P" in implementation[2]:
             self.BOARD = OPENMV
             if uart_n == None:
                 self.UART_N = 3
             import pyb
-            self.tx_pin = pyb.Pin("P4", pyb.Pin.OUT_PP)
+            self.rx_pin = pyb.Pin("P5", pyb.Pin.IN)
             print("OpenMV H7 defaults loaded")
         else:
             # default to pure ESP32 micorpython
@@ -117,7 +117,6 @@ class LPF2(object):
             if tx == None:
                 print("LMS-ESP32 defaults loaded")
                 self.TX_PIN_N = 19
-            self.tx_pin = machine.Pin(self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN)
             if rx == None:
                 self.RX_PIN_N = 18
             self.rx_pin = machine.Pin(self.RX_PIN_N, machine.Pin.IN)
@@ -158,7 +157,16 @@ class LPF2(object):
         return mode_list
 
     def wrt_tx_pin(self, val, wait):
-        # self.tx_pin = machine.Pin(self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN)
+        # Reinit pin to deal with cable unplugging and re-plugging
+        if self.BOARD == ESP32:
+            self.tx_pin = machine.Pin(self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN)
+        elif self.BOARD == OPENMVRT:
+            self.uart = machine.UART(self.UART_N, 2400)
+            self.tx_pin = machine.Pin("P4", machine.Pin.OUT, machine.Pin.PULL_DOWN)
+        elif self.BOARD == OPENMV:
+            import pyb
+            self.tx_pin = pyb.Pin("P4", pyb.Pin.OUT_PP)
+        
         self.tx_pin.value(val)
         utime.sleep_ms(wait)
 
