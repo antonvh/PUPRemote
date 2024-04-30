@@ -201,8 +201,6 @@ class PUPRemoteSensor(PUPRemote):
         self.connected = False
         self.power = power
         self.mode_names = []
-        self.last_heartbeat = ticks_ms()
-        self.heartbeat_interval = 20
         self.max_packet_size = max_packet_size
         self.lpup = lpf2.LPF2([], sensor_id=sensor_id, max_packet_size=max_packet_size)
 
@@ -251,42 +249,31 @@ class PUPRemoteSensor(PUPRemote):
 
         :return: True if connected to the hub, False otherwise.
         """
-        # Check if it's not to early to process a heartbeat
-        if ticks_ms() - self.last_heartbeat < self.heartbeat_interval:
-            return self.lpup.connected
-        else:
-            self.last_heartbeat = ticks_ms()
-
         # Get data from the hub and return previously stored payloads
         data = self.lpup.heartbeat()
 
         # Send data to the hub, by calling a function
-        mode = self.lpup.current_mode
-        if CALLABLE in self.commands[mode]:
-            result = None
-            if data is not None:
-                args = self.decode(self.commands[mode][FROM_HUB_FORMAT], data)
-                result = self.commands[mode][CALLABLE](*args)
-
-            else:
+        if data is not None:
+            pl, mode = data
+        
+            if CALLABLE in self.commands[mode]:
+                result = None
+                args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
                 try:
-                    result = self.commands[mode][CALLABLE]()
+                    result = self.commands[mode][CALLABLE](*args)
                 except TypeError:
-                    # print("Error: function %s() needs arguments." % self.commands[mode][NAME])
+                    print("Error: function %s() needs correct arguments." % self.commands[mode][NAME])
                     pass
-
-            if result is not None:  # Allow for 0
-                if not isinstance(result, tuple):
-                    result = (result,)
-                pl = self.encode(
-                    self.commands[mode][SIZE],
-                    self.commands[mode][TO_HUB_FORMAT],
-                    *result
-                )
-                self.lpup.send_payload(data=pl)
-        else:
-            # No callback. Just write the stored data from self.update_channel()
-            self.lpup.send_payload()
+                
+                if result is not None:  # Allow for 0
+                    if not isinstance(result, tuple):
+                        result = (result,)
+                    pl = self.encode(
+                        self.commands[mode][SIZE],
+                        self.commands[mode][TO_HUB_FORMAT],
+                        *result
+                    )
+                    self.lpup.send_payload(pl, mode)
 
         return self.lpup.connected
 
@@ -302,7 +289,7 @@ class PUPRemoteSensor(PUPRemote):
         pl = self.encode(
             self.commands[mode][SIZE], self.commands[mode][TO_HUB_FORMAT], *argv
         )
-        self.lpup.load_payload(pl, mode=mode)
+        self.lpup.send_payload(pl, mode)
 
 
 class PUPRemoteHub(PUPRemote):
