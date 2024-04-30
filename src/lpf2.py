@@ -56,11 +56,11 @@ DATA32 = const(2)
 DATAF = const(3)
 
 # Input/Output Mapping flags, can be combined with |
-WITH_NULL = const(2**7)# Supports NULL value
-FUNC_2 = const(2**6) # Supports Functional Mapping 2.0+
-ABSOLUTE = const(16) # ABS (Absolute [min..max])
-RELATIVE = const(8) # REL (Relative [-1..1])
-DISCRETE = const(4) # DIS (Discrete [0, 1, 2, 3])
+WITH_NULL = const(2**7)  # Supports NULL value
+FUNC_2 = const(2**6)  # Supports Functional Mapping 2.0+
+ABSOLUTE = const(16)  # ABS (Absolute [min..max])
+RELATIVE = const(8)  # REL (Relative [-1..1])
+DISCRETE = const(4)  # DIS (Discrete [0, 1, 2, 3])
 
 STRUCT_FMT = ("B", "H", "I", "f")
 
@@ -109,6 +109,7 @@ class LPF2(object):
             if uart_n == None:
                 self.UART_N = 3
             import pyb
+
             self.rx_pin = pyb.Pin("P5", pyb.Pin.IN)
             print("OpenMV H7 defaults loaded")
         else:
@@ -128,13 +129,13 @@ class LPF2(object):
         name,
         size=1,
         data_type=DATA8,
-        writable=0, # Leaving this for bw compatibility
+        writable=0,  # Leaving this for bw compatibility
         format="3.0",
         raw_range=[0, 100],
         percent_range=[0, 100],
         si_range=[0, 100],
         symbol="",
-        functionmap=[ABSOLUTE, ABSOLUTE], #[in (to hub), out (from hub)]
+        functionmap=[ABSOLUTE, ABSOLUTE],  # [in (to hub), out (from hub)]
         view=True,
     ):
         fig, dec = format.split(".")
@@ -159,14 +160,17 @@ class LPF2(object):
     def wrt_tx_pin(self, val, wait):
         # Reinit pin to deal with cable unplugging and re-plugging
         if self.BOARD == ESP32:
-            self.tx_pin = machine.Pin(self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN)
+            self.tx_pin = machine.Pin(
+                self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN
+            )
         elif self.BOARD == OPENMVRT:
             self.uart = machine.UART(self.UART_N, 2400)
             self.tx_pin = machine.Pin("P4", machine.Pin.OUT, machine.Pin.PULL_DOWN)
         elif self.BOARD == OPENMV:
             import pyb
+
             self.tx_pin = pyb.Pin("P4", pyb.Pin.OUT_PP)
-        
+
         self.tx_pin.value(val)
         utime.sleep_ms(wait)
 
@@ -207,7 +211,7 @@ class LPF2(object):
     def load_payload(self, data, mode=None):
         if mode is None:
             mode = self.current_mode
-        data_type=self.modes[mode][1][1]
+        data_type = self.modes[mode][1][1]
         if isinstance(data, bytes):
             bin_data = data
         elif isinstance(data, bytearray):
@@ -256,16 +260,16 @@ class LPF2(object):
         if data is not None:
             self.load_payload(data, mode)
         self.write(self.payloads[mode])
-        
+
     # ----- comm stuff
 
     def flush(self):
         return self.uart.read(self.uart.any())
-    
+
     @staticmethod
     def str_b(b):
         return " ".join([hex(c) for c in b])
-    
+
     def readchar(self):
         c = self.uart.read(1)
         if c == None:
@@ -293,10 +297,10 @@ class LPF2(object):
                 # Regular heartbeat pulse from the hub.
                 self.last_nack = utime.ticks_ms()  # reset heartbeat timer
                 # Confirm we're alive with data empty packet (extended mode 0)
-                self.write(b'\x46\x00\xb9')
+                self.write(b"\x46\x00\xb9")
                 # Resend latest data, just in case
                 self.send_payload()
-                
+
             elif b == CMD_Select:
                 self.last_nack = utime.ticks_ms()  # reset heartbeat timer
                 # The hub is asking us to change mode.
@@ -306,7 +310,7 @@ class LPF2(object):
                 if cksm == 0xFF ^ CMD_Select ^ mode:
                     self.current_mode = mode
                     self.send_payload()
-                    if self.debug: 
+                    if self.debug:
                         print(f"Mode switched to {mode}")
 
             elif b == 0x46:
@@ -375,14 +379,16 @@ class LPF2(object):
         return self.addChksm(bytearray([CMD_Vers]) + hard + soft)
 
     def str_info(self, data, num, info_type):
-        if isinstance(data, str): # Convert and truncate
-            data = bytearray(data, "UTF-8")[:self.max_packet_size]
-        else: # Bytes, or bytearray. Just truncate.
-            data = bytearray(data)[:self.max_packet_size]
-        exp = __num_bits(len(data) - 1)
-        pl=bytearray(2**exp)
-        pl[:len(data)] = data
-        return self.addChksm(bytearray([MSG_INFO | exp << CMD_LLL_SHIFT | num, info_type]) + pl)
+        if isinstance(data, str):  # Convert and truncate
+            dt = bytearray(data, "UTF-8")[: self.max_packet_size]
+        else:  # Bytes, or bytearray. Just truncate.
+            dt = bytearray(data)[: self.max_packet_size]
+        exp = __num_bits(len(dt) - 1)
+        pl = bytearray(2**exp)
+        pl[: len(dt)] = dt
+        return self.addChksm(
+            bytearray([MSG_INFO | exp << CMD_LLL_SHIFT | num, info_type]) + pl
+        )
 
     def buildFunctMap(self, fmap, num, info_type):
         return self.addChksm(
@@ -418,17 +424,20 @@ class LPF2(object):
     def defineModes(self):
         n_modes = len(self.modes) - 1
         n_views = [m[7] for m in self.modes].count(True) - 1
-        # return self.addChksm(bytearray([CMD_Mode, n_modes, n_views]))
-        return self.addChksm(bytearray([
-            CMD_MODES | LEN_4, 
-            min(n_modes,7), 
-            min(n_views,7),
-            n_modes, 
-            n_views,
-            ]))
+        return self.addChksm(
+            bytearray(
+                [
+                    CMD_MODES | LEN_4,
+                    min(n_modes, 7),
+                    min(n_views, 7),
+                    n_modes,
+                    n_views,
+                ]
+            )
+        )
 
     def setupMode(self, mode, num):
-        self.load_payload(b"\x00" * mode[8], num) # Store empty payload for this mode
+        self.load_payload(b"\x00" * mode[8], num)  # Store empty payload for this mode
         plus_8 = 0x00
         if num > 7:
             num -= 8
@@ -438,31 +447,35 @@ class LPF2(object):
         self.write(self.buildRange(mode[3], num, PCT | plus_8))  # write Percent range
         self.write(self.buildRange(mode[4], num, SI | plus_8))  # write SI range
         self.write(self.str_info(mode[5], num, SYM | plus_8))  # write symbol
-        self.write(self.buildFunctMap(mode[6], num, FUNCTION_MAP  | plus_8))  # write Function Map
+        self.write(
+            self.buildFunctMap(mode[6], num, FUNCTION_MAP | plus_8)
+        )  # write Function Map
         self.write(self.buildFormat(mode[1], num, FMT | plus_8))  # write format
+
     # -----   Start everything up
 
     def connect(self):
         fast_uart_hub = False
-        self.wrt_tx_pin(1, 5) # Say hello!
+        self.wrt_tx_pin(1, 5)  # Say hello!
         self.wrt_tx_pin(0, 0)
-        for i in range(25): # Wait for AOK
-            n=0
+        for i in range(25):  # Wait for AOK
+            n = 0
             while self.rx_pin.value() == 1:
                 utime.sleep_ms(1)
-                if n>20: break
-                n+=1
+                if n > 20:
+                    break
+                n += 1
             if self.debug:
                 print(i, "falling after ms high:", n)
-            if i > 10 and (n>21 or n<16):
+            if i > 10 and (n > 21 or n < 16):
                 fast_uart_hub = True
                 break
             while self.rx_pin.value() == 0:
                 utime.sleep_ms(1)
                 # Wait until rise again
-        
-        if fast_uart_hub:                
-            self.fast_uart()     
+
+        if fast_uart_hub:
+            self.fast_uart()
             utime.sleep_ms(5)
             self.write(b"\x04")
         else:
@@ -477,11 +490,6 @@ class LPF2(object):
             utime.sleep_ms(20)
             self.setupMode(mode, num)
             num -= 1
-        
-        # magic distance sensor data...
-        if self.sensor_id == 62:
-            utime.sleep_ms(20)
-            self.write(bytearray([0xA0,0x08,0x00,0x60,0x00,0x42,0x0A,0x47,0x32,0x31,0x39,0x36,0x38,0x31,0x00,0x00,0x00,0x00,0x3D]))
 
         self.write(b"\x04")  # ACK
         end = utime.ticks_ms() + 2500
@@ -489,12 +497,8 @@ class LPF2(object):
             data = self.readchar()
             if data == BYTE_ACK:
                 self.connected = True
-                # self.uart.deinit()  # We're done with slow UART
                 break
             utime.sleep_ms(5)
-                # We're getting crap data, on pybricks there's probably no hub.
-                # self.uart.read(self.uart.any())  # Flush
-                # break
 
         if self.connected:
             self.last_nack = utime.ticks_ms()
