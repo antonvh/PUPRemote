@@ -60,7 +60,7 @@ single_mode_ds = [LPF2.mode("DISTL", 1, DATA16, format="5.1", symbol="CM", raw_r
 
 sensor_emu = LPF2(single_mode_ls, 61, debug=True) # Works, Pybricks, SPIKE3
 
-#sensor_emu = LPF2(single_mode_ds, 62, debug=True) #DOES NOT WORK, NEVER GETS ACK on mode def
+sensor_emu = LPF2(single_mode_ds, 62, debug=True) #DOES NOT WORK, NEVER GETS ACK on mode def
 
 # Crash requires import machine;machine.reset()
 
@@ -73,7 +73,7 @@ while 1:
     sensor_emu.load_payload(time()%10)
     data_in = sensor_emu.heartbeat()
     if data_in:
-        print(data_in)
+        print(f"\nReceived: {data_in[0]} on mode {data_in[1]}")
 
 #     if ticks_ms() > last_heartbeat + heartbeat_interval:
 #         sensor_emu.heartbeat()

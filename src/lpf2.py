@@ -158,7 +158,7 @@ class LPF2(object):
         return mode_list
 
     def wrt_tx_pin(self, val, wait):
-        self.tx_pin = machine.Pin(self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN)
+        # self.tx_pin = machine.Pin(self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN)
         self.tx_pin.value(val)
         utime.sleep_ms(wait)
 
@@ -327,7 +327,7 @@ class LPF2(object):
                         ck ^= buf[i]
 
                     if ck == self.readchar():
-                        return buf
+                        return buf, wrt_mode
                     else:
                         print(
                             "Checksum error. Try reducing max_packet_size to 16 if using Pybricks."
@@ -447,7 +447,6 @@ class LPF2(object):
             if self.debug:
                 print(i, "falling after ms high:", n)
             if i > 10 and (n>21 or n<16):
-                print(n)
                 fast_uart_hub = True
                 break
             while self.rx_pin.value() == 0:
@@ -458,7 +457,6 @@ class LPF2(object):
             self.fast_uart()     
             utime.sleep_ms(5)
             self.write(b"\x04")
-            print(self.flush())
         else:
             self.slow_uart()
             self.write(b"\x00")
