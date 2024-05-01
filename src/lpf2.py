@@ -1,8 +1,8 @@
 # LPF2 class allows communication between LEGO SPIKE Prime and third party devices.
 __author__ = "Anton Vanhoucke & Ste7an"
-__copyright__ = "Copyright 2023, AntonsMindstorms.com"
+__copyright__ = "Copyright 2023, 2024 AntonsMindstorms.com"
 __license__ = "GPL"
-__version__ = "1.1"
+__version__ = "1.5"
 __status__ = "Production"
 
 import machine
@@ -373,10 +373,19 @@ class LPF2(object):
         rate = baud.to_bytes(4, "little")
         return self.addChksm(bytearray([CMD_Baud]) + rate)
 
-    def defineVers(self, hardware, software):
-        hard = hardware.to_bytes(4, "big")
-        soft = software.to_bytes(4, "big")
-        return self.addChksm(bytearray([CMD_Vers]) + hard + soft)
+    @staticmethod
+    def str_vers_to_4_bytes(str_vers: str) -> bytes:
+        stvb = bytes([int(n)&0xFF for n in str_vers.split(".")])
+        if len(stvb) >= 4:
+            return stvb[:4]
+        return b"\x00" * (4 - len(stvb)) + stvb
+
+    def defineVers(self, hardware: str, software: str):
+        return self.addChksm(
+            bytearray([CMD_Vers])
+            + self.str_vers_to_4_bytes(hardware)
+            + self.str_vers_to_4_bytes(software)
+        )
 
     def str_info(self, data, num, info_type):
         if isinstance(data, str):  # Convert and truncate
@@ -484,7 +493,7 @@ class LPF2(object):
         self.write(self.setType(self.sensor_id))
         self.write(self.defineModes())  # tell how many modes
         self.write(self.defineBaud(115200))
-        self.write(self.defineVers(1, 1))
+        self.write(self.defineVers("0.1", __version__))
         num = len(self.modes) - 1
         for mode in reversed(self.modes):
             utime.sleep_ms(20)
