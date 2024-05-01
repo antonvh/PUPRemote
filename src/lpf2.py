@@ -109,7 +109,7 @@ class LPF2(object):
             if uart_n == None:
                 self.UART_N = 3
             import pyb
-
+            self.pyb = pyb
             self.rx_pin = pyb.Pin("P5", pyb.Pin.IN)
             print("OpenMV H7 defaults loaded")
         else:
@@ -167,9 +167,7 @@ class LPF2(object):
             self.uart = machine.UART(self.UART_N, 2400)
             self.tx_pin = machine.Pin("P4", machine.Pin.OUT, machine.Pin.PULL_DOWN)
         elif self.BOARD == OPENMV:
-            import pyb
-
-            self.tx_pin = pyb.Pin("P4", pyb.Pin.OUT_PP)
+            self.tx_pin = self.pyb.Pin("P4", self.pyb.Pin.OUT_PP)
 
         self.tx_pin.value(val)
         utime.sleep_ms(wait)
@@ -187,7 +185,7 @@ class LPF2(object):
             self.uart = machine.UART(self.UART_N, 2400)
 
         elif self.BOARD == OPENMV:
-            self.uart = pyb.UART(self.UART_N, 2400)
+            self.uart = self.pyb.UART(self.UART_N, 2400)
 
     def fast_uart(self):
         if self.BOARD == ESP32:
@@ -202,9 +200,7 @@ class LPF2(object):
             self.uart = machine.UART(self.UART_N, 115200)
 
         elif self.BOARD == OPENMV:
-            import pyb
-
-            self.uart = pyb.UART(self.UART_N, 115200)
+            self.uart = self.pyb.UART(self.UART_N, 115200)
 
     # -------- Payload definition
 
