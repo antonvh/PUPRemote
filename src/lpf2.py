@@ -503,7 +503,6 @@ class LPF2(object):
             if data == BYTE_ACK:
                 self.connected = True
                 break
-            utime.sleep_ms(5)
 
         if self.connected:
             self.last_nack = utime.ticks_ms()
