@@ -163,8 +163,9 @@ class PUPRemoteHub(PUPRemote):
         :param argv: As many arguments as you need to pass to the remote function.
         :type argv: Any
         :param wait_ms: The time to wait for the sensor to respond after
-            a write from the hub, defaults to 100ms. This does not delay the read,
+            a write from the hub, defaults to 0ms. This does not delay the read,
             i.e. when you don't pass any arguments, the read will happen immediately.
+            A good value is the size of the write argument in bytes * 1.5ms
         :type wait_ms: int
         """
     
@@ -188,7 +189,7 @@ class PUPRemoteHub(PUPRemote):
                 mode, 
                 self._int8_to_uint8(tuple(payl + b'\x00'*( size - len(payl))))
                 )
-            wait(wait_ms+size*1.5)
+            wait(wait_ms)
 
         data = self.pup_device.read(mode)
         size=len(data)
