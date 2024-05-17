@@ -1,9 +1,11 @@
 __author__ = "Anton Vanhoucke & Ste7an"
 __copyright__ = "Copyright 2023, AntonsMindstorms.com"
 __license__ = "GPL"
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 __status__ = "Production"
 
+# !! Upload this file into your editor at code.pybricks.com
+# !! Also upload pupremote.py or pupremote_hub.py (and rename it pupremote.py)
 
 from pupremote import PUPRemoteHub
 
@@ -199,7 +201,7 @@ class BluePad:
 
         :param servo_nr: Servo motor counting from 0
         :type servo_nr: byte
-        :param pos: Position of the Servo motor
+        :param pos: Position of the Servo motor (0-180)
         :type: word (2 byte int)
         """
         global cur_mode
@@ -209,3 +211,73 @@ class BluePad:
         cur_mode=1
         return r
 
+# Simple fucntions to import as blocks
+from pybricks.parameters import Port, Color
+
+rgb_values = {
+    Color.WHITE: (255,255,255),
+    Color.RED: (255,0,0),
+    Color.ORANGE: (255, 127,0),
+    Color.BLACK: (0,0,0),
+    Color.NONE: (0,0,0),
+    Color.YELLOW: (255,255,0),
+    Color.GREEN: (0,255,0),
+    Color.CYAN: (0,255,255),
+    Color.BLUE: (0,0,255),
+    Color.VIOLET: (127,127,255),
+    Color.MAGENTA: (255,0,255),
+    Color.GRAY: (127,127,127),
+}
+
+def bluepad_init(port_letter,nintendo=True):
+    global _bp
+    global _nintendo
+    port = eval('Port.' + port_letter)
+    _bp = BluePad(port)
+    _nintendo = nintendo
+    
+
+def get_left_stick_vertical():
+    # Return same direction and max value as Pybricks controller block
+    return _bp.gamepad()[1]/512*-100
+
+def get_right_stick_horizontal():
+    # Return same direction and max value as Pybricks controller block
+    return _bp.gamepad()[2]/512*100
+
+def get_right_stick_vertical():
+    # Return same direction and max value as Pybricks controller block
+    return _bp.gamepad()[3]/512*-100
+
+def get_left_stick_horizontal():
+    # Return same direction and max value as Pybricks controller block
+    return _bp.gamepad()[0]/512*100
+
+def get_direction_pad():
+    # Return same values as pybricks dpad block
+    return _bp.gamepad()[5]-1
+
+def get_buttons():
+    # Return same values as pybricks dpad block
+    return _bp.gamepad()[4]-1
+
+def color_convert(color, intensity):
+    c=(0,0,0)
+    if color in rgb_values:
+        color = rgb_values[color]
+    if isinstance(color, tuple):
+        c = tuple([int(val*intensity) for val in color])
+    return c
+
+def set_neopixel(led_nr, color, intensity=1, write=True):
+    _bp.neopixel_set(led_nr, color_convert(color,intensity), write)
+        
+def init_neopixel(nr_leds,pin):
+    _bp.neopixel_init(nr_leds,pin)
+
+def fill_neopixel(color, intensity, write=True):
+    _bp.neopixel_fill(color_convert(color,intensity), write)
+        
+def set_servo(servo_nr, angle):
+    # Angle in range 0-180. 90 is neutral.
+    _bp.servo(int(servo_nr), int(angle))
