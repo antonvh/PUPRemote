@@ -132,9 +132,9 @@ class LPF2(object):
                     self.TX_PIN_N = LMS_ESP32_TX_PIN
             if rx == None:
                 if ESP32_V2:
-                    self.RX_PIN_N = LMS_ESP32_V2_TX_PIN
+                    self.RX_PIN_N = LMS_ESP32_V2_RX_PIN
                 else:
-                    self.RX_PIN_N = LMS_ESP32_TX_PIN
+                    self.RX_PIN_N = LMS_ESP32_RX_PIN
             self.rx_pin = machine.Pin(self.RX_PIN_N, machine.Pin.IN)
             if uart_n == None:
                 self.UART_N = 2
