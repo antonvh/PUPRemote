@@ -21,6 +21,13 @@ ESP32 = const(1)
 # sys.implementation[2]: OpenMV IMXRT1060-MIMXRT1062DVJ6A
 OPENMVRT = const(2)
 
+LMS_ESP32_RX_PIN = 18
+LMS_ESP32_TX_PIN = 19
+
+LMS_ESP32_V2_RX_PIN = 8
+LMS_ESP32_V2_TX_PIN = 7
+
+
 MAX_PKT = const(32)
 
 BYTE_NACK = const(0x02)
@@ -115,11 +122,19 @@ class LPF2(object):
         else:
             # default to pure ESP32 micorpython
             self.BOARD = ESP32
+            import gc
+            ESP32_V2 = gc.mem_free() < 3000000
             if tx == None:
                 print("LMS-ESP32 defaults loaded")
-                self.TX_PIN_N = 19
+                if ESP32_V2:
+                    self.TX_PIN_N = LMS_ESP32_V2_TX_PIN
+                else:
+                    self.TX_PIN_N = LMS_ESP32_TX_PIN
             if rx == None:
-                self.RX_PIN_N = 18
+                if ESP32_V2:
+                    self.RX_PIN_N = LMS_ESP32_V2_TX_PIN
+                else:
+                    self.RX_PIN_N = LMS_ESP32_TX_PIN
             self.rx_pin = machine.Pin(self.RX_PIN_N, machine.Pin.IN)
             if uart_n == None:
                 self.UART_N = 2
@@ -511,3 +526,4 @@ class LPF2(object):
                 self.fast_uart()
         else:
             print("\nFailed to connect to hub")
+
