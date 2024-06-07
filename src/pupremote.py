@@ -227,7 +227,6 @@ class PUPRemoteSensor(PUPRemote):
             if self.power:
                 mode_name = (
                     mode_name.encode("ascii")
-                    + b"\x00" * (5 - len(mode_name))
                     + b"\x00\x80\x00\x00\x00\x05\x04"
                 )
         self.lpup.modes.append(
