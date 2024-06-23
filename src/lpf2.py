@@ -122,8 +122,12 @@ class LPF2(object):
         else:
             # default to pure ESP32 micorpython
             self.BOARD = ESP32
-            import gc
-            ESP32_V2 = gc.mem_free() < 3000000
+            try:
+                import lms_esp32
+                ESP32_V2 = (lms_esp32.version() == 2)
+            except:
+                import gc
+                ESP32_V2 = gc.mem_free() < 3000000
             if tx == None:
                 print("LMS-ESP32 defaults loaded")
                 if ESP32_V2:
@@ -526,4 +530,5 @@ class LPF2(object):
                 self.fast_uart()
         else:
             print("\nFailed to connect to hub")
+
 
