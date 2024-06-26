@@ -116,16 +116,16 @@ class LPF2(object):
             # default to pure ESP32 micorpython
             self.BOARD = ESP32
             try:
-                from lms_esp32 import RXPIN,TXPIN
+                from lms_esp32 import RX_PIN,TX_PIN
             except ImportError:
-                RXPIN = 18
-                TXPIN = 19
+                RX_PIN = 18
+                TX_PIN = 19
 
             if tx == None:
                 print("LMS-ESP32 defaults loaded")
-                self.TX_PIN_N = TXPIN
+                self.TX_PIN_N = TX_PIN
             if rx == None:
-                self.RX_PIN_N = RXPIN
+                self.RX_PIN_N = RX_PIN
             self.rx_pin = machine.Pin(self.RX_PIN_N, machine.Pin.IN)
             if uart_n == None:
                 self.UART_N = 2
