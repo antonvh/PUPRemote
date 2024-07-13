@@ -104,7 +104,7 @@ class LPF2(object):
                 self.UART_N = 1
             self.rx_pin = machine.Pin("P5", machine.Pin.IN)
             print("OpenMV RT defaults loaded")
-        elif "OPENMV4P" in implementation[2]:
+        elif "OPENMV4" in implementation[2]:
             self.BOARD = OPENMV
             if uart_n == None:
                 self.UART_N = 3
