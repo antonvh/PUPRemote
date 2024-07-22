@@ -260,9 +260,11 @@ class PUPRemoteSensor(PUPRemote):
                 args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
                 try:
                     result = self.commands[mode][CALLABLE](*args)
-                except TypeError:
-                    print("Error: function %s() needs correct arguments." % self.commands[mode][NAME])
-                    pass
+                except TypeError as e:
+                    if "positional arguments" in str(e):
+                        print("Error: function {0}(): {1}".format(self.commands[mode][NAME], e))
+                    else:
+                        raise
                 
                 if result is not None:  # Allow for 0
                     if not isinstance(result, tuple):
