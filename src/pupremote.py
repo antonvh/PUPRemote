@@ -1,7 +1,7 @@
 __author__ = "Anton Vanhoucke & Ste7an"
 __copyright__ = "Copyright 2023,2024 AntonsMindstorms.com"
 __license__ = "GPL"
-__version__ = "1.5"
+__version__ = "1.6"
 __status__ = "Production"
 
 try:
@@ -226,7 +226,7 @@ class PUPRemoteSensor(PUPRemote):
         else:  # only enable power when len(mode_name)<=5
             if self.power:
                 mode_name = (
-                    mode_name.encode("ascii")
+                    mode_name.encode("ascii") + b' '*(5-len(mode_name))
                     + b"\x00\x80\x00\x00\x00\x05\x04"
                 )
         self.lpup.modes.append(
