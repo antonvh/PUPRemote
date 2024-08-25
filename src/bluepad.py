@@ -5,9 +5,10 @@ __version__ = "2.0.0"
 __status__ = "Production"
 
 # !! Upload this file into your editor at code.pybricks.com
-# !! Also upload pupremote.py or pupremote_hub.py (and rename it pupremote.py)
 
-from pupremote import PUPRemoteHub
+from pybricks.iodevices import PUPDevice
+import ustruct
+
 
 FILL = 0x10
 ZERO = 0x20
@@ -28,39 +29,46 @@ class BluePad:
    
     """
 
-    try:
-        from pupremote import PUPRemoteHub
-    except:
-        pass
     def __init__(self,port):
-        self.prh=PUPRemoteHub(port)
-        self.prh.add_command('gpled','hhhhHH','16B')
-        self.prh.add_command('gpsrv','hhhhHH','8H')
+        self.pup=PUPDevice(port)
+        self.sensor_id=self.pup.info()['id']
         self.cur_mode=0
-        self.nr_leds=64
+        self.nr_leds=24
+        self.arr_servos=[0]*8
 
-    def gamepad(self):
+    def send(self,byte_vals):
+        self.cur_mode=0
+        if self.sensor_id==64:
+            signed_vals = ustruct.unpack('9b',ustruct.pack('9B',*byte_vals))
+            self.pup.write(self.cur_mode,signed_vals)
+        else:
+            word_vals = ustruct.unpack('8H',ustruct.pack('16B',*byte_vals))
+            self.pup.write(self.cur_mode,word_vals)
+
+    def gamepad(self,mode=-1):
         """
         Returns the reading of a gamepad as a tuple. Returns the x- and y values of the left and right
         pads. Buttons are encoded as single bits in `buttonss`. The dpad values are encoded in `dpad`.
          
         :return: Tuple (left_pad_x,left_pad_y,right_pad_x,right_pad_y,buttons,dpad)
         """
-    
-        if self.cur_mode==0:
-            return self.prh.call('gpled')
-        elif self.cur_mode==1:
-            return self.prh.call('gpsrv')
+        if mode>=0:
+            self.cur_mode=mode
+        vals=self.pup.read(self.cur_mode)
+        if self.sensor_id==64: # color matrix 9 values
+            return vals[:6]
         else:
-            return None
+            byte_vals=ustruct.unpack('16B',ustruct.pack('8H',*vals))
+            return [i-128 for i in byte_vals[:4]]+[byte_vals[4],byte_vals[5]]
+        
 
     def btns_pressed(self,btns,nintendo=False):
         """
         Decodes the buttons pressed and converts the buttons to a string
-        containing the pressed buttons ['X','O','#','^']
+        containing the pressed buttons ['X','O','[]','Δ']
 
         :param btns: The word read from the gamepad containing the binary encodeing of pressed buttons
-        :type btns: Word
+        : type btns: Word
         :param nintendo: Indicates that a nintendo gamepad is used.
         :return: String with pressed buttons
         """  
@@ -69,7 +77,7 @@ class BluePad:
         if nintendo:
             btn_val=['B','A','Y','X','L','R','ZL','ZR']
         else:
-            btn_val=['X','O','#','^']
+            btn_val=['X','O','[]','V']
         btns_string=[j  for i,j in zip(bits_btns,btn_val) if i]
         return btns_string
 
@@ -79,7 +87,7 @@ class BluePad:
         containing the pressed buttons ['L','R','U','D']
 
         :param btns: The word read from the gamepad containing the binary encoding of pressed dpad-buttons
-        :type btns: Word
+        : type btns: Word
 
         :return: String with pressed dpad-buttons
         """  
@@ -105,25 +113,29 @@ class BluePad:
         leds[0]=CONFIG
         leds[1]=nr_leds
         leds[2]=pin
-        r=self.prh.call('gpled',*leds)
+        r=self.send(leds)
         self.cur_mode=0
         self.nr_leds=nr_leds
         return r
 
-    def neopixel_fill(self,color,write=True):
+    def neopixel_fill(self,r,g,b,write=True):
         """
         Fills all the neopixels with the same color.
 
-        :param color: tuple with (red,green,blue) color.
-        :type r: tuple
+        :param r: red color value
+        :type r: byte
+        :param g: green color value
+        :type g: byte
+        :param b: blue color value
+        :type b: byte
         :param write: If True write the output to the NeoPixels. Defaults to True.
         :type write: bool
         """
         global cur_mode
         leds=[0]*16
         leds[0]=FILL|WRITE if write else FILL
-        leds[1:4]=color
-        r=self.prh.call('gpled',*leds)
+        leds[1:4]=[r,g,b]
+        r=self.send(leds)
         self.cur_mode=0
         return r
 
@@ -136,12 +148,12 @@ class BluePad:
         """
         leds=[0]*16
         leds[0]=ZERO|WRITE if write else FILL
-        r=self.prh.call('gpled',*leds)
+        r=self.send(leds)
         self.cur_mode=0
         return r
 
 
-    def neopixel_set(self,led_nr,color,write=True):
+    def neopixel_set(self,led_nr,r,g,b,write=True):
         """
         Sets single NeoPixel at position led_nr with color=(r,g,b).
 
@@ -160,8 +172,8 @@ class BluePad:
             print("error neopixel_set: led_nr larger than number of leds!")
             r=None
         else:
-            leds[3:6]=color
-            r=self.prh.call('gpled',*leds)
+            leds[3:6]=[r,g,b]
+            r=self.send(leds)
         self.cur_mode=0
         return r
 
@@ -173,7 +185,7 @@ class BluePad:
         :type start_led: byte
         :param nr_led: Number of leds to set.
         :type nr_led: byte
-        :param led_arr: Array containing r,g,b for each neopixel. 
+        :param led_arr: Array containing tuples r,g,b for each neopixel. 
         :param write: If True write the output to the NeoPixels. Defaults to True.
         :type write: bool
         """
@@ -187,7 +199,7 @@ class BluePad:
         else:
             if len(led_arr)==3*nr_led:
                 leds[3:3+nr_led*3]=led_arr
-                r=self.prh.call('gpled',*leds)
+                r=self.send(leds)
             else:
                 print("error neopixel_set_multi: led_nr does not correspons with led_arr")
                 r=None
@@ -201,15 +213,19 @@ class BluePad:
 
         :param servo_nr: Servo motor counting from 0
         :type servo_nr: byte
-        :param pos: Position of the Servo motor (0-180)
+        :param pos: Position of the Servo motor
         :type: word (2 byte int)
         """
-        global cur_mode
-        s=[0]*4
-        s[servo_nr]=pos%180
-        r=self.prh.call('gpsrv',*s)
-        cur_mode=1
+        self.arr_servos[servo_nr]=pos%181
+        print("internal",self.arr_servos)
+        self.cur_mode=1
+        if self.sensor_id==64: # color matrix
+            byte_vals=ustruct.unpack('9b',ustruct.pack('4HB',*self.arr_servos[:4],0))
+            r=self.pup.write(self.cur_mode,byte_vals)
+        else:    
+            r=self.pup.write(self.cur_mode,self.arr_servos)
         return r
+
 
 # Simple fucntions to import as blocks
 from pybricks.parameters import Port, Color
