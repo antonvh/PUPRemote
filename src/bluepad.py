@@ -217,7 +217,6 @@ class BluePad:
         :type: word (2 byte int)
         """
         self.arr_servos[servo_nr]=pos%181
-        print("internal",self.arr_servos)
         self.cur_mode=1
         if self.sensor_id==64: # color matrix
             byte_vals=ustruct.unpack('9b',ustruct.pack('4HB',*self.arr_servos[:4],0))
