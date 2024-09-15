@@ -45,7 +45,7 @@ def largedata(*argv):
     return lg_data
 
 
-p=PUPRemoteSensor(sensor_id=SPIKE_ULTRASONIC)
+p=PUPRemoteSensor(sensor_id=SPIKE_ULTRASONIC, power = True)
 p.add_command('msg',"repr","repr")
 p.add_command('num',from_hub_fmt="3b", to_hub_fmt="3b")
 p.add_command('smalldata',from_hub_fmt="16B", to_hub_fmt="16B")
