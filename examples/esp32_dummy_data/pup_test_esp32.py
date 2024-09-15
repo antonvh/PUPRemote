@@ -20,7 +20,7 @@ def num(*argv):
 
 
 
-p=PUPRemoteSensor(sensor_id=SPIKE_ULTRASONIC)
+p=PUPRemoteSensor(sensor_id=SPIKE_ULTRASONIC, power = True)
 p.add_command('msg',"B","B")
 p.add_command('num',from_hub_fmt="3b", to_hub_fmt="3b")
 
