@@ -25,14 +25,17 @@ p.add_command('msg',"repr","repr")
 p.add_command('num',from_hub_fmt="b", to_hub_fmt="b")
 
 # Do no execute procedures, but only present new data to hub
-p.add_channel('one_way', to_hub_fmt="bbb")
+p.add_channel('one_w', to_hub_fmt="bbb")
 
 ### End of pupremote setup code
 
 ### Main loop
+cntd=False
 while(True):
     # Add more sensor processing code here
     # ....
-    p.update_channel('one_way', 1,2,3)
+    p.update_channel('one_w', 1,2,3)
     # Try to connect, send data and return the connected state.
-    connected=p.process()
+    cntd=p.process()
+    # cntd is True if connected
+
