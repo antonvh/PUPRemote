@@ -102,33 +102,30 @@ class LPF2(object):
             self.BOARD = OPENMVRT
             if uart_n == None:
                 self.UART_N = 1
-            self.rx_pin = machine.Pin("P5", machine.Pin.IN)
             print("OpenMV RT defaults loaded")
         elif "OPENMV4" in implementation[2]:
             self.BOARD = OPENMV
-            if uart_n == None:
-                self.UART_N = 3
             import pyb
             self.pyb = pyb
-            self.rx_pin = pyb.Pin("P5", pyb.Pin.IN)
+            if uart_n == None:
+                self.UART_N = 3
             print("OpenMV H7 defaults loaded")
         else:
-            # default to pure ESP32 micorpython
             self.BOARD = ESP32
             try:
                 from lms_esp32 import RX_PIN,TX_PIN
             except ImportError:
                 RX_PIN = 18
                 TX_PIN = 19
-
             if tx == None:
-                print("LMS-ESP32 defaults loaded")
                 self.TX_PIN_N = TX_PIN
             if rx == None:
                 self.RX_PIN_N = RX_PIN
-            self.rx_pin = machine.Pin(self.RX_PIN_N, machine.Pin.IN)
             if uart_n == None:
                 self.UART_N = 2
+            print(
+                "LMS-ESP32 defaults loaded, with rx={}, tx={}".format(self.RX_PIN_N, self.TX_PIN_N)
+            )
 
     @staticmethod
     def mode(
@@ -163,18 +160,21 @@ class LPF2(object):
         ]
         return mode_list
 
-    def wrt_tx_pin(self, val, wait):
-        # Reinit pin to deal with cable unplugging and re-plugging
+    def init_pins(self):
         if self.BOARD == ESP32:
+            self.rx_pin = machine.Pin(self.RX_PIN_N, machine.Pin.IN)
             self.tx_pin = machine.Pin(
                 self.TX_PIN_N, machine.Pin.OUT, machine.Pin.PULL_DOWN
             )
         elif self.BOARD == OPENMVRT:
-            self.uart = machine.UART(self.UART_N, 2400)
+            self.rx_pin = machine.Pin("P5", machine.Pin.IN)
             self.tx_pin = machine.Pin("P4", machine.Pin.OUT, machine.Pin.PULL_DOWN)
         elif self.BOARD == OPENMV:
+            self.rx_pin = self.pyb.Pin("P5", self.pyb.Pin.IN)
             self.tx_pin = self.pyb.Pin("P4", self.pyb.Pin.OUT_PP)
 
+    def wrt_tx_pin(self, val, wait):
+        # Reinit pin to deal with cable unplugging and re-plugging
         self.tx_pin.value(val)
         utime.sleep_ms(wait)
 
@@ -204,6 +204,7 @@ class LPF2(object):
 
         elif self.BOARD == OPENMVRT:
             self.uart = machine.UART(self.UART_N, 115200)
+            utime.sleep_ms(5)
 
         elif self.BOARD == OPENMV:
             self.uart = self.pyb.UART(self.UART_N, 115200)
@@ -257,9 +258,9 @@ class LPF2(object):
             if self.debug:
                 print("Write payload, but not connected.")
             return
-        if mode is None:
+        if mode == None:
             mode = self.current_mode
-        if data is not None:
+        if data != None:
             self.load_payload(data, mode)
         self.write(self.payloads[mode])
 
@@ -273,7 +274,10 @@ class LPF2(object):
         return " ".join([hex(c) for c in b])
 
     def readchar(self):
-        c = self.uart.read(1)
+        if self.uart.any():
+            c = self.uart.read(1)
+        else:
+            return -1
         if c == None:
             return -1
         else:
@@ -467,6 +471,7 @@ class LPF2(object):
 
     def connect(self):
         fast_uart_hub = False
+        self.init_pins()
         self.wrt_tx_pin(1, 5)  # Say hello!
         self.wrt_tx_pin(0, 0)
         for i in range(25):  # Wait for AOK
@@ -480,6 +485,8 @@ class LPF2(object):
                 print(i, "falling after ms high:", n)
             if i > 10 and (n > 21 or n < 16):
                 fast_uart_hub = True
+                if self.debug:
+                    print("Fast uart handshake after drops: ",n)
                 break
             while self.rx_pin.value() == 0:
                 utime.sleep_ms(1)
@@ -512,7 +519,7 @@ class LPF2(object):
 
         if self.connected:
             self.last_nack = utime.ticks_ms()
-            print(f"\nSuccessfully connected to hub with senor id {self.sensor_id}")
+            print("\nSuccessfully connected to hub with senor id {}".format(self.sensor_id))
             if not fast_uart_hub:
                 self.fast_uart()
         else:
