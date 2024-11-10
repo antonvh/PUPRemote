@@ -276,8 +276,12 @@ class LPF2(object):
     def readchar(self):
         if self.uart.any():
             c = self.uart.read(1)
-        else:
-            return -1
+        else: # Try again once
+            utime.sleep_ms(1)
+            if self.uart.any():
+                c = self.uart.read(1)
+            else:
+                return -1
         if c == None:
             return -1
         else:
