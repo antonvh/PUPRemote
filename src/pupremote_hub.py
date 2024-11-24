@@ -29,6 +29,37 @@ SPIKE_ULTRASONIC = const(62)
 CALLBACK = const(0)
 CHANNEL = const(1)
 
+def connect(port):
+    """
+    Connect to LMS-ESP32. Pass Port as a string ('A') or a number (1=Port.A)
+    """
+    global pr
+    if isinstance(port, str):
+        pyport = eval('Port.'+port)
+    if isinstance(port, int):
+        pyport = eval('Port.'+chr(64+port))
+    pr = PUPRemoteHub(pyport)
+
+def call(*args):
+    try:
+        return pr.call(*args)
+    except:
+        print("Use the connect & add_channel or add_command blocks before call")
+        raise
+
+def add_channel(name, encoding):
+    try:
+        pr.add_channel(name, encoding)
+    except:
+        print("Use the connect command before adding a channel")
+        raise
+
+def add_command(name, to_hub, from_hub):
+    try:
+        pr.add_command(name, to_hub_fmt=to_hub, from_hub_fmt=from_hub)
+    except:
+        print("Use the connect command before adding a command")
+        raise
 
 class PUPRemote:
     """
