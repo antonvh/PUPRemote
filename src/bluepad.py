@@ -1,7 +1,7 @@
 __author__ = "Anton Vanhoucke & Ste7an"
 __copyright__ = "Copyright 2023, AntonsMindstorms.com"
 __license__ = "GPL"
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __status__ = "Production"
 
 # !! Upload this file into your editor at code.pybricks.com
@@ -56,10 +56,10 @@ class BluePad:
             self.cur_mode=mode
         vals=self.pup.read(self.cur_mode)
         if self.sensor_id==64: # color matrix 9 values
-            return vals[:6]
-        else:
-            byte_vals=ustruct.unpack('16B',ustruct.pack('8H',*vals))
-            return [i-128 for i in byte_vals[:4]]+[byte_vals[4],byte_vals[5]]
+            return list(vals[:4])+[vals[4]&255,vals[5]&255]
+        else: # color sensor id = 61
+            byte_vals=ustruct.unpack('16b',ustruct.pack('8H',*vals))
+            return [(i&255)-128 for i in byte_vals[:4]]+[(byte_vals[4]+256)%256,(byte_vals[5]+256)%256]
         
 
     def btns_pressed(self,btns,nintendo=False):
@@ -118,20 +118,16 @@ class BluePad:
         self.nr_leds=nr_leds
         return r
 
-    def neopixel_fill(self,r,g,b,write=True):
+    def neopixel_fill(self,color,write=True):
         """
         Fills all the neopixels with the same color.
 
-        :param r: red color value
-        :type r: byte
-        :param g: green color value
-        :type g: byte
-        :param b: blue color value
-        :type b: byte
+        :param color: tuple with (r,g,b) colorsred color value
         :param write: If True write the output to the NeoPixels. Defaults to True.
         :type write: bool
         """
         global cur_mode
+        r,g,b = color
         leds=[0]*16
         leds[0]=FILL|WRITE if write else FILL
         leds[1:4]=[r,g,b]
@@ -153,7 +149,7 @@ class BluePad:
         return r
 
 
-    def neopixel_set(self,led_nr,r,g,b,write=True):
+    def neopixel_set(self,led_nr,color,write=True):
         """
         Sets single NeoPixel at position led_nr with color=(r,g,b).
 
@@ -164,6 +160,7 @@ class BluePad:
         :param write: If True writes the output to the NeoPixels. Defaults to True.
         :type write: bool
         """
+        r,g,b = color
         leds=[0]*16
         leds[0]=SET|WRITE if write else FILL
         leds[1]=1
@@ -209,7 +206,7 @@ class BluePad:
     def servo(self,servo_nr,pos):
         """
         Sets Servo motor servo_nr to the specified position. Servo motors should be connected to
-        GPIO pins 21, 22, 23 and 25.
+        GPIO pins 21, 22, 23 and 25 for LMS-ESP32v1 and to GPIO pins 19, 20, 21 and 22 for LMS-ESP32v2
 
         :param servo_nr: Servo motor counting from 0
         :type servo_nr: byte
@@ -250,31 +247,30 @@ def bluepad_init(port_letter,nintendo=True):
     port = eval('Port.' + port_letter)
     _bp = BluePad(port)
     _nintendo = nintendo
-    
 
 def get_left_stick_vertical():
     # Return same direction and max value as Pybricks controller block
-    return _bp.gamepad()[1]/512*-100
-
-def get_right_stick_horizontal():
-    # Return same direction and max value as Pybricks controller block
-    return _bp.gamepad()[2]/512*100
-
-def get_right_stick_vertical():
-    # Return same direction and max value as Pybricks controller block
-    return _bp.gamepad()[3]/512*-100
+    return _bp.gamepad()[1]/128*-100
 
 def get_left_stick_horizontal():
     # Return same direction and max value as Pybricks controller block
-    return _bp.gamepad()[0]/512*100
+    return _bp.gamepad()[0]/128*100
+    
+def get_right_stick_horizontal():
+    # Return same direction and max value as Pybricks controller block
+    return _bp.gamepad()[2]/128*100
+
+def get_right_stick_vertical():
+    # Return same direction and max value as Pybricks controller block
+    return _bp.gamepad()[3]/128*-100
 
 def get_direction_pad():
     # Return same values as pybricks dpad block
-    return _bp.gamepad()[5]-1
+    return _bp.gamepad()[5]
 
 def get_buttons():
     # Return same values as pybricks dpad block
-    return _bp.gamepad()[4]-1
+    return _bp.gamepad()[4]
 
 def color_convert(color, intensity):
     c=(0,0,0)
@@ -296,3 +292,6 @@ def fill_neopixel(color, intensity, write=True):
 def set_servo(servo_nr, angle):
     # Angle in range 0-180. 90 is neutral.
     _bp.servo(int(servo_nr), int(angle))
+
+def gamepad():
+    return _bp.gamepad()
