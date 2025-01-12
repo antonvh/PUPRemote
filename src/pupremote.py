@@ -343,11 +343,12 @@ class PUPRemoteHub(PUPRemote):
             return None
 
         if len(argv) > 0:
-            payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
-            self.pup_device.write(
-                mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
-            )
-            wait(wait_ms)
+            argv=[]
+        payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
+        self.pup_device.write(
+            mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
+        )
+        wait(wait_ms)
 
         data = self.pup_device.read(mode)
         size = len(data)
