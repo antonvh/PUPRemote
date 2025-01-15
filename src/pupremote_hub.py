@@ -126,7 +126,7 @@ class PUPRemote:
             SIZE: msg_size,
             }
         )
-        if command_type == CALLBACK:
+        if command_type in [CALLBACK, CHANNEL]:
             self.commands[-1][FROM_HUB_FORMAT] = from_hub_fmt
             # self.commands[-1][CALLABLE] = eval(mode_name)
 
