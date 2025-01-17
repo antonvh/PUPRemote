@@ -342,11 +342,12 @@ class PUPRemoteHub(PUPRemote):
             print("PUPRemote Error: Nothing connected or no script running on remote\n")
             return None
 
-        payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
-        self.pup_device.write(
-            mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
-        )
-        wait(wait_ms)
+        if FROM_HUB_FORMAT in self.commands[mode]: 
+            payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
+            self.pup_device.write(
+                mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
+            )
+            wait(wait_ms)
 
         data = self.pup_device.read(mode)
         size = len(data)
