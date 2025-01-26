@@ -179,11 +179,7 @@ class PUPRemoteHub(PUPRemote):
     def __init__(self, port, max_packet_size=MAX_PKT):
         super().__init__(max_packet_size)
         self.port = port
-        try:
-            self.pup_device = PUPDevice(port)
-        except OSError:
-            self.pup_device = None
-            print("PUPDevice not ready on port", port)
+        self.pup_device = PUPDevice(port)
 
     def call(self, mode_name: str, *argv, wait_ms=0):
         """
@@ -204,11 +200,7 @@ class PUPRemoteHub(PUPRemote):
         size = self.commands[mode][SIZE] 
         # Dummy read action to work around mode setting bug in Pybricks beta 2.2.0b8
         # Also check if a sensor or sensor emulator is connected.abs
-        try:
-            self.pup_device.read(mode)
-        except:
-            print("PUPRemote Error: Nothing connected or no script running on remote\n")
-            return None
+        self.pup_device.read(mode)
 
         if FROM_HUB_FORMAT in self.commands[mode]: 
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
