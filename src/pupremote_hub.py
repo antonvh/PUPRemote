@@ -183,7 +183,8 @@ class PUPRemoteHub(PUPRemote):
             self.pup_device = PUPDevice(port)
         except OSError:
             self.pup_device = None
-            print("PUPDevice not ready on port", port)
+            print("Check wiring and remote script. Unable to connect on ", self.port)
+            raise
 
     def call(self, mode_name: str, *argv, wait_ms=0):
         """
@@ -207,8 +208,8 @@ class PUPRemoteHub(PUPRemote):
         try:
             self.pup_device.read(mode)
         except:
-            print("PUPRemote Error: Nothing connected or no script running on remote\n")
-            return None
+            print("Check wiring and remote script. Unable to connect on ", self.port)
+            raise
 
         if FROM_HUB_FORMAT in self.commands[mode]: 
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
