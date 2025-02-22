@@ -218,17 +218,12 @@ class PUPRemoteSensor(PUPRemote):
         if from_hub_fmt != "":
             writeable = lpf2.ABSOLUTE
         max_mode_name_len = 5 if self.power else self.max_packet_size
-        if len(mode_name) > max_mode_name_len:
-            print(
-                "Error: mode_name can't be longer than %d%s."
-                % (max_mode_name_len, " if power=True" if self.power else "")
+        assert len(mode_name) < max_mode_name_len, "Command name must be shorter than {} with power={}".format(max_mode_name_len, self.power)
+        if self.power:
+            mode_name = (
+                mode_name.encode("ascii") + b' '*(5-len(mode_name))
+                + b"\x00\x80\x00\x00\x00\x05\x04"
             )
-        else:  # only enable power when len(mode_name)<=5
-            if self.power:
-                mode_name = (
-                    mode_name.encode("ascii") + b' '*(5-len(mode_name))
-                    + b"\x00\x80\x00\x00\x00\x05\x04"
-                )
         self.lpup.modes.append(
             self.lpup.mode(
                 mode_name,
