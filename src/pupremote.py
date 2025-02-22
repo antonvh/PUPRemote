@@ -218,10 +218,13 @@ class PUPRemoteSensor(PUPRemote):
         if from_hub_fmt != "":
             writeable = lpf2.ABSOLUTE
         max_mode_name_len = 5 if self.power else self.max_packet_size
-        assert len(mode_name) < max_mode_name_len, "Command name must be shorter than {} with power={}".format(max_mode_name_len, self.power)
+        assert len(mode_name) < max_mode_name_len, "Name must be shorter than {} with power={}".format(
+            max_mode_name_len, self.power
+        )
         if self.power:
             mode_name = (
-                mode_name.encode("ascii") + b' '*(5-len(mode_name))
+                mode_name.encode("ascii")
+                + b" " * (5 - len(mode_name))
                 + b"\x00\x80\x00\x00\x00\x05\x04"
             )
         self.lpup.modes.append(
@@ -249,7 +252,7 @@ class PUPRemoteSensor(PUPRemote):
         # Send data to the hub, by calling a function
         if data is not None:
             pl, mode = data
-        
+
             if CALLABLE in self.commands[mode]:
                 result = None
                 args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
@@ -257,10 +260,14 @@ class PUPRemoteSensor(PUPRemote):
                     result = self.commands[mode][CALLABLE](*args)
                 except TypeError as e:
                     if "positional arguments" in str(e):
-                        print("Error: function {0}(): {1}".format(self.commands[mode][NAME], e))
+                        print(
+                            "Error: function {0}(): {1}".format(
+                                self.commands[mode][NAME], e
+                            )
+                        )
                     else:
                         raise
-                
+
                 if result is not None:  # Allow for 0
                     if not isinstance(result, tuple):
                         result = (result,)
@@ -338,7 +345,7 @@ class PUPRemoteHub(PUPRemote):
             print("Check wiring and remote script. Unable to connect on ", self.port)
             raise
 
-        if FROM_HUB_FORMAT in self.commands[mode]: 
+        if FROM_HUB_FORMAT in self.commands[mode]:
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
             self.pup_device.write(
                 mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
