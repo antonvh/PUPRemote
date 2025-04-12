@@ -328,17 +328,17 @@ class PUPRemoteHub(PUPRemote):
         :type mode_name: str
         :param argv: As many arguments as you need to pass to the remote function.
         :type argv: Any
-        :param wait_ms: The time to wait for the sensor to respond after
-            a write from the hub, defaults to 0ms. This does not delay the read,
-            i.e. when you don't pass any arguments, the read will happen immediately.
-            A good value is the size of the write argument in bytes * 1.5ms
+        :param wait_ms: The time to wait before reading after sending the call payload.
+            Only applicable if there is a payload outbound from the hub. So not for channels or
+            functions without parameters. 
+            Defaults to 0ms. A good value is `struct.calcsize(from_hub_fmt) * 1.5` (ms)
         :type wait_ms: int
         """
 
         mode = self.modes[mode_name]
         size = self.commands[mode][SIZE]
         # Dummy read action to work around mode setting bug in Pybricks beta 2.2.0b8
-        # Also check if a sensor or sensor emulator is connected.abs
+        # Also check if a sensor or sensor emulator is connected.
         try:
             self.pup_device.read(mode)
         except:
