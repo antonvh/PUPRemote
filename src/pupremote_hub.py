@@ -119,6 +119,10 @@ class PUPRemote:
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
             msg_size = max(size_to_hub_fmt,size_from_hub_fmt )
 
+        modes = self.pup_device.info()['modes']
+        assert len(self.commands) < len(modes), "more commands than on remote side"
+        assert mode_name == modes[len(self.commands)][0], "different mode_name than on remote side"
+        assert msg_size == modes[len(self.commands)][1], "different parameter size than on remote side"
         self.commands.append(
             {
             NAME: mode_name,
