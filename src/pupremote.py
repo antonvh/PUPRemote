@@ -51,6 +51,7 @@ except ImportError:
 
 
 MAX_PKT = const(16)
+MAX_COMMANDS = const(16)
 
 # Dictionary keys
 NAME = const(0)
@@ -125,6 +126,8 @@ class PUPRemote:
         :type from_hub_fmt: str
 
         """
+        assert len(self.commands) < MAX_COMMANDS, 'command limit exceeded'
+
         if to_hub_fmt == "repr" or from_hub_fmt == "repr":
             msg_size = self.max_packet_size
         else:
