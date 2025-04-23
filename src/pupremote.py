@@ -51,6 +51,7 @@ except ImportError:
 
 
 MAX_PKT = const(16)
+MAX_COMMANDS = const(16)
 
 # Dictionary keys
 NAME = const(0)
@@ -132,6 +133,8 @@ class PUPRemote:
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
             msg_size = max(size_to_hub_fmt, size_from_hub_fmt)
 
+        assert len(self.commands) < MAX_COMMANDS, 'Command limit exceeded'
+        assert msg_size <= self.max_packet_size, "Payload exceeds maximum packet size"
         self.commands.append(
             {
                 NAME: mode_name,
@@ -217,8 +220,8 @@ class PUPRemoteSensor(PUPRemote):
             self.commands[-1][CALLABLE] = eval(mode_name)
         if from_hub_fmt != "":
             writeable = lpf2.ABSOLUTE
-        max_mode_name_len = 5 if self.power else self.max_packet_size
-        assert len(mode_name) <= max_mode_name_len, "Name length must be ≤ {} with power={}".format(
+        max_mode_name_len = 5 if self.power else 11
+        assert len(mode_name) <= max_mode_name_len, "Name length must be <= {} with power={}".format(
             max_mode_name_len, self.power
         )
         if self.power:

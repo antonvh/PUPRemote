@@ -28,11 +28,12 @@ BYTE_ACK = const(0x04)
 CMD_Type = const(0x40)  # @, set sensor type command
 CMD_Select = const(0x43)  #  C, sets modes on the fly
 CMD_MODES = const(0x41)  # I, set mode type command
+CMD_EXT_MODE = const(0x46)
 CMD_Baud = const(0x52)  # R, set the transmission baud rate
 CMD_Vers = const(0x5F)  # _,  set the version number
 MSG_INFO = const(0x80)  # name command
 MSG_DATA = const(0xC0)  # data command
-CMD_EXT_MODE = const(0x6)
+MSG_EXT_MODE = const(0x46)
 EXT_MODE_0 = const(0x00)
 EXT_MODE_8 = const(0x08)  # only used for extended mode > 7
 CMD_LLL_SHIFT = const(3)
@@ -236,12 +237,15 @@ class LPF2(object):
         assert len(bin_data) > 0, "Payload is empty"
         assert len(bin_data) <= bytesize, "Wrong payload size"
 
-        payload = bytearray(2**bit + 2)
+        payload = bytearray(2**bit + 5)
+        payload[0] = MSG_EXT_MODE
+        payload[1] = EXT_MODE_0 if mode < 8 else EXT_MODE_8
+        payload[2] = 0xFF ^ payload[0] ^ payload[1]
         cksm = 0xFF
-        payload[0] = MSG_DATA | (bit << CMD_LLL_SHIFT) | mode
-        cksm ^= payload[0]
+        payload[3] = MSG_DATA | (bit << CMD_LLL_SHIFT) | (mode & 7)
+        cksm ^= payload[3]
         for i in range(len(bin_data)):
-            payload[i + 1] = bin_data[i]
+            payload[i + 4] = bin_data[i]
             cksm ^= bin_data[i]
         payload[-1] = cksm  # No need to checksum zero bytes.
 
@@ -306,8 +310,6 @@ class LPF2(object):
             if b == BYTE_NACK:
                 # Regular heartbeat pulse from the hub.
                 self.last_nack = utime.ticks_ms()  # reset heartbeat timer
-                # Confirm we're alive with data empty packet (extended mode 0)
-                self.write(b"\x46\x00\xb9")
                 # Resend latest data, just in case
                 self.send_payload()
 
@@ -323,13 +325,12 @@ class LPF2(object):
                     if self.debug:
                         print(f"Mode switched to {mode}")
 
-            elif b == 0x46:
+            elif b == CMD_EXT_MODE:
                 self.last_nack = utime.ticks_ms()  # reset heartbeat timer
-                # Data from hub to sensor should read 0x46, 0x00, 0xb9
                 ext_mode = self.readchar()  # 0x00 or 0x08
-                cksm = self.readchar()  # 0xb9
+                cksm = self.readchar()  # 0xb9 or 0xb1
 
-                if cksm == 0xFF ^ 0x46 ^ ext_mode:
+                if cksm == 0xFF ^ CMD_EXT_MODE ^ ext_mode:
                     b = self.readchar()  # CMD_Data | LENGTH | MODE
 
                     # Bitmask and then shift to get the LENGTH (=size exponent) of the data
