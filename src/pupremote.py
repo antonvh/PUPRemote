@@ -126,8 +126,6 @@ class PUPRemote:
         :type from_hub_fmt: str
 
         """
-        assert len(self.commands) < MAX_COMMANDS, 'command limit exceeded'
-
         if to_hub_fmt == "repr" or from_hub_fmt == "repr":
             msg_size = self.max_packet_size
         else:
@@ -135,6 +133,8 @@ class PUPRemote:
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
             msg_size = max(size_to_hub_fmt, size_from_hub_fmt)
 
+        assert len(self.commands) < MAX_COMMANDS, 'Command limit exceeded'
+        assert msg_size <= self.max_packet_size, "Payload exceeds maximum packet size"
         self.commands.append(
             {
                 NAME: mode_name,
