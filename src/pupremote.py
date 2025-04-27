@@ -59,6 +59,8 @@ SIZE = const(1)
 TO_HUB_FORMAT = const(2)
 FROM_HUB_FORMAT = const(3)
 CALLABLE = const(4)
+ARGS_TO_HUB = const(5)
+ARGS_FROM_HUB = const(6)
 
 #: WeDo Ultrasonic sensor id
 WEDO_ULTRASONIC = const(35)
@@ -140,11 +142,12 @@ class PUPRemote:
                 NAME: mode_name,
                 TO_HUB_FORMAT: to_hub_fmt,
                 SIZE: msg_size,
+                ARGS_TO_HUB: len(struct.unpack(to_hub_fmt,bytearray(struct.calcsize(to_hub_fmt))))
             }
         )
         if command_type == CALLBACK:
             self.commands[-1][FROM_HUB_FORMAT] = from_hub_fmt
-            # self.commands[-1][CALLABLE] = eval(mode_name)
+            self.commands[-1][ARGS_FROM_HUB] = len(struct.unpack(from_hub_fmt,bytearray(struct.calcsize(from_hub_fmt))))
 
         # Build a dictionary of mode names and their index
         self.modes[mode_name] = len(self.commands) - 1
@@ -259,21 +262,13 @@ class PUPRemoteSensor(PUPRemote):
             if CALLABLE in self.commands[mode]:
                 result = None
                 args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
-                try:
-                    result = self.commands[mode][CALLABLE](*args)
-                except TypeError as e:
-                    if "positional arguments" in str(e):
-                        print(
-                            "Error: function {0}(): {1}".format(
-                                self.commands[mode][NAME], e
-                            )
-                        )
-                    else:
-                        raise
+                assert self.commands[mode][ARGS_FROM_HUB] == len(args), "Result of {} did not fit from_hub_fmt".format(self.commands[mode][NAME])
+                result = self.commands[mode][CALLABLE](*args)
 
                 if result is not None:  # Allow for 0
                     if not isinstance(result, tuple):
                         result = (result,)
+                    assert self.commands[mode][ARGS_TO_HUB] == len(result), "Result of {} did not fit to_hub_fmt.".format(self.commands[mode][NAME])
                     pl = self.encode(
                         self.commands[mode][SIZE],
                         self.commands[mode][TO_HUB_FORMAT],
@@ -349,6 +344,7 @@ class PUPRemoteHub(PUPRemote):
             raise
 
         if FROM_HUB_FORMAT in self.commands[mode]:
+            assert self.commands[mode][ARGS_FROM_HUB] == len(argv), "Arguments of '{}' did not fit from_hub_fmt".format(self.commands[mode][NAME])
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
             self.pup_device.write(
                 mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
