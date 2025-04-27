@@ -119,11 +119,6 @@ class PUPRemote:
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
             msg_size = max(size_to_hub_fmt,size_from_hub_fmt )
 
-        modes = self.pup_device.info()['modes']
-        assert len(self.commands) < len(modes), "more commands than on remote side"
-        assert mode_name == modes[len(self.commands)][0].rstrip(), \
-            f"different mode_name than on remote side, expected '{modes[len(self.commands)][0].rstrip()}'"
-        assert msg_size == modes[len(self.commands)][1], "different parameter size than on remote side"
         self.commands.append(
             {
             NAME: mode_name,
@@ -190,6 +185,17 @@ class PUPRemoteHub(PUPRemote):
             self.pup_device = None
             print("Check wiring and remote script. Unable to connect on ", self.port)
             raise
+
+    def add_command(self, mode_name, to_hub_fmt = "", from_hub_fmt = "", command_type=CALLBACK):
+        super().add_command(mode_name, to_hub_fmt, from_hub_fmt, command_type)
+        # Check the newly added commands against the advertised modes.
+        modes = self.pup_device.info()['modes']
+        n = len(self.commands)-1 # Zero indexed mode number
+        assert len(self.commands) <= len(modes), "More commands than on remote side"
+        assert mode_name == modes[n][0].rstrip(), \
+            f"Expected '{modes[n][0].rstrip()}' as mode {n}, but got '{mode_name}'"
+        assert self.commands[-1][SIZE] == modes[n][1], \
+            f"Different parameter size than on remote side. Check formats."
 
     def call(self, mode_name: str, *argv, wait_ms=0):
         """
