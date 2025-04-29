@@ -18,6 +18,8 @@ SIZE        = const(1)
 TO_HUB_FORMAT      = const(2)
 FROM_HUB_FORMAT    = const(3)
 CALLABLE    = const(4)
+ARGS_TO_HUB = const(5)
+ARGS_FROM_HUB = const(6)
 
 #: WeDo Ultrasonic sensor id
 WEDO_ULTRASONIC = const(35)
@@ -114,21 +116,26 @@ class PUPRemote:
         """
         if to_hub_fmt == "repr" or from_hub_fmt == "repr":
             msg_size = self.max_packet_size
+            num_args_from_hub = -1
+            num_args_to_hub = -1
         else:
             size_to_hub_fmt = struct.calcsize(to_hub_fmt)
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
             msg_size = max(size_to_hub_fmt,size_from_hub_fmt )
+            num_args_to_hub = len(struct.unpack(to_hub_fmt,bytearray(struct.calcsize(to_hub_fmt))))
+            num_args_from_hub = len(struct.unpack(from_hub_fmt,bytearray(struct.calcsize(from_hub_fmt))))
 
         self.commands.append(
             {
             NAME: mode_name,
             TO_HUB_FORMAT: to_hub_fmt,
             SIZE: msg_size,
+            ARGS_TO_HUB: num_args_to_hub
             }
         )
         if command_type == CALLBACK:
             self.commands[-1][FROM_HUB_FORMAT] = from_hub_fmt
-            # self.commands[-1][CALLABLE] = eval(mode_name)
+            self.commands[-1][ARGS_FROM_HUB] = num_args_from_hub
 
         # Build a dictionary of mode names and their index
         self.modes[mode_name] = len(self.commands)-1
@@ -214,15 +221,12 @@ class PUPRemoteHub(PUPRemote):
     
         mode = self.modes[mode_name]
         size = self.commands[mode][SIZE] 
-        # Dummy read action to work around mode setting bug in Pybricks beta 2.2.0b8
-        # Also check if a sensor or sensor emulator is connected.abs
-        try:
-            self.pup_device.read(mode)
-        except:
-            print("Check wiring and remote script. Unable to connect on ", self.port)
-            raise
 
         if FROM_HUB_FORMAT in self.commands[mode]: 
+            num_args = self.commands[mode][ARGS_FROM_HUB]
+            if num_args > 0:
+                assert len(argv) == num_args, \
+                "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
             self.pup_device.write(
                 mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
