@@ -267,12 +267,14 @@ class PUPRemoteSensor(PUPRemote):
                 result = None
                 args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
                 result = self.commands[mode][CALLABLE](*args)
+                num_args = self.commands[mode][ARGS_TO_HUB]
 
-                if result is not None:  # Allow for 0
+                if result is None:
+                    assert num_args <= 0, "{}() did not return value(s)".format(self.commands[mode][NAME])
+                else:
                     if not isinstance(result, tuple):
                         result = (result,)
-                    num_args = self.commands[mode][ARGS_TO_HUB]
-                    if num_args > 0:
+                    if num_args >= 0:
                         assert num_args == len(result), \
                             "{}() returned {} value(s) instead of expected {}".format(
                                 self.commands[mode][NAME],
@@ -359,7 +361,7 @@ class PUPRemoteHub(PUPRemote):
         
         if FROM_HUB_FORMAT in self.commands[mode]:
             num_args = self.commands[mode][ARGS_FROM_HUB]
-            if num_args > 0:
+            if num_args >= 0:
                 assert len(argv) == num_args, \
                 "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
