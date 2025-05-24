@@ -224,7 +224,7 @@ class PUPRemoteHub(PUPRemote):
 
         if FROM_HUB_FORMAT in self.commands[mode]: 
             num_args = self.commands[mode][ARGS_FROM_HUB]
-            if num_args > 0:
+            if num_args >= 0:
                 assert len(argv) == num_args, \
                 "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
