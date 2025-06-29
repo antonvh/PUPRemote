@@ -1,17 +1,19 @@
 __author__ = "Anton Vanhoucke & Ste7an"
 __copyright__ = "Copyright 2023,2024 AntonsMindstorms.com"
 __license__ = "GPL"
-__version__ = "2.0"
+__version__ = "2.1"
 __status__ = "Production"
 
 try:
     from pybricks.iodevices import PUPDevice
     from pybricks.tools import wait, run_task
     import ustruct as struct
+
     side = "Hub"
 except ImportError:
     # We surely aren't on pybricks. Probably on the sensor side (openmv or lms-esp32)
     side = "Sensor"
+
     # Avoid errors when using Pybricks classes and functions.
     class PUPDevice:
         def __init__(self, port):
@@ -30,7 +32,7 @@ except ImportError:
     import asyncio
     import lpf2
     import struct
-    import queue
+    from collections import deque
 
 try:
     from micropython import const
@@ -42,6 +44,7 @@ except ImportError:
 
 MAX_PKT = const(16)
 MAX_COMMANDS = const(16)
+MAX_COMMAND_QUEUE_LENGTH = const(10)
 
 # Dictionary keys
 NAME = const(0)
@@ -203,7 +206,8 @@ class PUPRemoteSensor(PUPRemote):
         self.mode_names = []  ## ?
         self.max_packet_size = max_packet_size
         self.lpup = lpf2.LPF2([], sensor_id=sensor_id, max_packet_size=max_packet_size)
-        self._callback_queue = queue.Queue()
+        self._callback_queue = deque((), MAX_COMMAND_QUEUE_LENGTH)
+        self._callback_lock = asyncio.Lock()
 
     def add_command(
         self,
@@ -244,13 +248,20 @@ class PUPRemoteSensor(PUPRemote):
         while True:
             data = self.lpup.heartbeat()
             if data:
-                await self._callback_queue.put(data)
+                async with self._callback_lock:
+                    self._callback_queue.append(data)
             await asyncio.sleep(interval_ms / 1000)
 
     async def _process_callbacks(self):
         """Process incoming callbacks from queue serially"""
         while True:
-            pl, mode = await self._callback_queue.get()
+            await asyncio.sleep(0)  # Yield to allow _heartbeat_loop to enqueue
+            async with self._callback_lock:
+                if self._callback_queue:
+                    pl, mode = self._callback_queue.popleft()
+                else:
+                    continue
+
             if CALLABLE in self.commands[mode]:
                 result = None
                 args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
@@ -277,12 +288,12 @@ class PUPRemoteSensor(PUPRemote):
                     )
                     self.lpup.send_payload(pl, mode)
 
-    async def process_async(self, interval_ms: int=50):
+    async def process_async(self, interval_ms: int = 50):
         """Start both heartbeat and callback processing tasks."""
         # heartbeat at least 15 Hz (66ms)
         hb_task = asyncio.create_task(self._heartbeat_loop(interval_ms))
         cb_task = asyncio.create_task(self._process_callbacks())
-        await asyncio.gather(hb_task, cb_task)        
+        await asyncio.gather(hb_task, cb_task)
 
     def process(self):
         """
@@ -402,7 +413,7 @@ class PUPRemoteHub(PUPRemote):
         assert (
             not run_task()
         ), "Use 'call_multitask' instead of 'call', with multiple start blocks or multitask blocks"
-        
+
         mode = self.modes[mode_name]
         size = self.commands[mode][SIZE]
 
@@ -433,17 +444,19 @@ class PUPRemoteHub(PUPRemote):
 
         :param command_name: The name of the command
         :type command_name: string
-        :param Optionally, you can pass the <n_from_hub> number of parameters. 
-        
+        :param Optionally, you can pass the <n_from_hub> number of parameters.
+
         :return: It will return a single value, or a list, depending on the value of <n_to_hub>.
 
         """
         if not self._multitask_loop_running:
-            raise AssertionError("Start 'process_calls' as a seperate task (coroutine) before using 'call_multitask()'")
+            raise AssertionError(
+                "Start 'process_calls' as a seperate task (coroutine) before using 'call_multitask()'"
+            )
 
         result_holder = {"done": False, "result": None, "error": None}
         self._queue.append((command_name, argv, wait_ms, result_holder))
-        
+
         while not result_holder["done"]:
             await wait(1)  # cooperative multitasking
 
@@ -473,7 +486,7 @@ class PUPRemoteHub(PUPRemote):
         result = self.decode(self.commands[mode][TO_HUB_FORMAT], raw_data)
         # Convert tuple size 1 to single value
         return result[0] if len(result) == 1 else result
-        
+
     async def process_calls(self):
         """
         Process multitask MicroPUP calls in a queue to avoid EAGAIN or IOERR.
@@ -486,7 +499,9 @@ class PUPRemoteHub(PUPRemote):
                 command_name, argv, wait_ms, result_holder = self._queue.pop(0)
 
                 try:
-                    result = await self._execute_call(command_name, *argv, wait_ms=wait_ms)
+                    result = await self._execute_call(
+                        command_name, *argv, wait_ms=wait_ms
+                    )
                     result_holder["result"] = result
                 except Exception as e:
                     result_holder["error"] = e
@@ -498,7 +513,7 @@ class PUPRemoteHub(PUPRemote):
             await wait(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if side == "Sensor":
         # -------------------------------------------------
         # Example sensor-side (lms-esp32) program using process_async
@@ -508,6 +523,7 @@ if __name__ == '__main__':
         # updates a 'value' channel, and responds to a 'reset' RPC.
 
         counter = 1
+
         async def reset():
             # Remote commands also need to be async!!
             global counter
@@ -515,22 +531,22 @@ if __name__ == '__main__':
             print("Reset")
             await asyncio.sleep(1)
             return 1  # acknowledgement
-                
+
         async def main():
             global counter
             pr = PUPRemoteSensor()
-            
+
             # RPC: reset counter on hub request
-            pr.add_command('reset', to_hub_fmt='repr')
-            pr.add_channel('value', to_hub_fmt='f')
+            pr.add_command("reset", to_hub_fmt="repr")
+            pr.add_channel("value", to_hub_fmt="f")
 
             # Start heartbeat/callback processing
             asyncio.create_task(pr.process_async())
 
             # User loop: read analog input and update channel
             while True:
-                val = 1/counter  # replace with actual sensor read
-                pr.update_channel('value', float(val))
+                val = 1 / counter  # replace with actual sensor read
+                pr.update_channel("value", float(val))
                 counter += 1
                 # Yes: the main loop can be slow without hindering the heartbeat!
                 await asyncio.sleep(0.5)
@@ -539,32 +555,32 @@ if __name__ == '__main__':
             asyncio.run(main())
         finally:
             asyncio.new_event_loop()
-            
+
     elif side == "Hub":
         # -------------------------------------------------
         # Example hub-side program using process_async
         # -------------------------------------------------
         from pybricks.parameters import Port
         from pybricks.tools import multitask, run_task
-        
+
         pr = PUPRemoteHub(Port.A)
-        pr.add_command('reset', to_hub_fmt='repr')
-        pr.add_channel('value', to_hub_fmt='f')
-        
+        pr.add_command("reset", to_hub_fmt="repr")
+        pr.add_channel("value", to_hub_fmt="f")
+
         async def main1():
             # User program. Put anything you like in here.
             while True:
                 await wait(50)
                 val = await pr.call_multitask("value")
                 print(val)
-                
+
         async def main2():
             # User program. Put anything you like in here.
             for i in range(10):
                 await wait(1000)
                 val = await pr.call_multitask("reset")
                 print(val)
-            
+
         async def main():
             # race=True ensures the program finishes when the first user thread is done.
             await multitask(main1(), main2(), pr.process_calls(), race=True)
