@@ -1,7 +1,7 @@
 __author__ = "Anton Vanhoucke & Ste7an"
 __copyright__ = "Copyright 2023,2024 AntonsMindstorms.com"
 __license__ = "GPL"
-__version__ = "1.6"
+__version__ = "2.0"
 __status__ = "Production"
 
 try:
@@ -30,6 +30,7 @@ except ImportError:
     import asyncio
     import lpf2
     import struct
+    import queue
 
 try:
     from micropython import const
@@ -202,7 +203,7 @@ class PUPRemoteSensor(PUPRemote):
         self.mode_names = []  ## ?
         self.max_packet_size = max_packet_size
         self.lpup = lpf2.LPF2([], sensor_id=sensor_id, max_packet_size=max_packet_size)
-        self._callback_queue = asyncio.Queue()
+        self._callback_queue = queue.Queue()
 
     def add_command(
         self,
@@ -249,44 +250,39 @@ class PUPRemoteSensor(PUPRemote):
     async def _process_callbacks(self):
         """Process incoming callbacks from queue serially"""
         while True:
-            data = await self._callback_queue.get()
-            self._run_callback_and_reply(data)
+            pl, mode = await self._callback_queue.get()
+            if CALLABLE in self.commands[mode]:
+                result = None
+                args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
+                result = await self.commands[mode][CALLABLE](*args)
+                num_args = self.commands[mode][ARGS_TO_HUB]
+
+                if result is None:
+                    assert num_args <= 0, "{}() did not return value(s)".format(
+                        self.commands[mode][NAME]
+                    )
+                else:
+                    if not isinstance(result, tuple):
+                        result = (result,)
+                    if num_args >= 0:
+                        assert num_args == len(
+                            result
+                        ), "{}() returned {} value(s) instead of expected {}".format(
+                            self.commands[mode][NAME], len(result), num_args
+                        )
+                    pl = self.encode(
+                        self.commands[mode][SIZE],
+                        self.commands[mode][TO_HUB_FORMAT],
+                        *result,
+                    )
+                    self.lpup.send_payload(pl, mode)
 
     async def process_async(self, interval_ms: int=50):
         """Start both heartbeat and callback processing tasks."""
         # heartbeat at least 15 Hz (66ms)
         hb_task = asyncio.create_task(self._heartbeat_loop(interval_ms))
         cb_task = asyncio.create_task(self._process_callbacks())
-        await asyncio.gather(hb_task, cb_task)
-
-    def _run_callback_and_reply(self, data):
-        """Decode, assert, and respond to a single callback packet"""
-        pl, mode = data
-        if CALLABLE in self.commands[mode]:
-            result = None
-            args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
-            result = self.commands[mode][CALLABLE](*args)
-            num_args = self.commands[mode][ARGS_TO_HUB]
-
-            if result is None:
-                assert num_args <= 0, "{}() did not return value(s)".format(
-                    self.commands[mode][NAME]
-                )
-            else:
-                if not isinstance(result, tuple):
-                    result = (result,)
-                if num_args >= 0:
-                    assert num_args == len(
-                        result
-                    ), "{}() returned {} value(s) instead of expected {}".format(
-                        self.commands[mode][NAME], len(result), num_args
-                    )
-                pl = self.encode(
-                    self.commands[mode][SIZE],
-                    self.commands[mode][TO_HUB_FORMAT],
-                    *result,
-                )
-                self.lpup.send_payload(pl, mode)
+        await asyncio.gather(hb_task, cb_task)        
 
     def process(self):
         """
@@ -298,7 +294,32 @@ class PUPRemoteSensor(PUPRemote):
         """
         data = self.lpup.heartbeat()
         if data is not None:
-            self._run_callback_and_reply(data)
+            pl, mode = data
+            if CALLABLE in self.commands[mode]:
+                result = None
+                args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
+                result = self.commands[mode][CALLABLE](*args)
+                num_args = self.commands[mode][ARGS_TO_HUB]
+
+                if result is None:
+                    assert num_args <= 0, "{}() did not return value(s)".format(
+                        self.commands[mode][NAME]
+                    )
+                else:
+                    if not isinstance(result, tuple):
+                        result = (result,)
+                    if num_args >= 0:
+                        assert num_args == len(
+                            result
+                        ), "{}() returned {} value(s) instead of expected {}".format(
+                            self.commands[mode][NAME], len(result), num_args
+                        )
+                    pl = self.encode(
+                        self.commands[mode][SIZE],
+                        self.commands[mode][TO_HUB_FORMAT],
+                        *result,
+                    )
+                    self.lpup.send_payload(pl, mode)
         return self.lpup.connected
 
     def update_channel(self, mode_name: str, *argv):
@@ -485,17 +506,21 @@ if __name__ == '__main__':
 
         # This example reads a generic analog sensor every 200ms,
         # updates a 'value' channel, and responds to a 'reset' RPC.
+
+        counter = 1
+        async def reset():
+            # Remote commands also need to be async!!
+            global counter
+            counter = 1
+            print("Reset")
+            await asyncio.sleep(1)
+            return 1  # acknowledgement
+                
         async def main():
+            global counter
             pr = PUPRemoteSensor()
             
             # RPC: reset counter on hub request
-            counter = 1
-            async def reset():
-                nonlocal counter
-                counter = 1
-                await asyncio.sleep(2)
-                return 1  # acknowledgement
-            
             pr.add_command('reset', to_hub_fmt='repr')
             pr.add_channel('value', to_hub_fmt='f')
 
@@ -508,7 +533,7 @@ if __name__ == '__main__':
                 pr.update_channel('value', float(val))
                 counter += 1
                 # Yes: the main loop can be slow without hindering the heartbeat!
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.5)
 
         try:
             asyncio.run(main())
@@ -530,15 +555,15 @@ if __name__ == '__main__':
             # User program. Put anything you like in here.
             while True:
                 await wait(50)
-                ack, val = await pr.call_multitask("value")
-                print(ack, val)
+                val = await pr.call_multitask("value")
+                print(val)
                 
         async def main2():
             # User program. Put anything you like in here.
             for i in range(10):
                 await wait(1000)
-                ack, val = await pr.call_multitask("reset")
-                print(ack, val)
+                val = await pr.call_multitask("reset")
+                print(val)
             
         async def main():
             # race=True ensures the program finishes when the first user thread is done.
