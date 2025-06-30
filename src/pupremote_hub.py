@@ -149,12 +149,9 @@ class PUPRemote:
             else:
                 # Probably nothing left after stripping zero's
                 return ('',)
-            
         else:
             size = struct.calcsize(fmt)
-            data = struct.unpack(fmt, data[:size])
-
-        return data
+            return struct.unpack(fmt, data[:size])
 
     def encode(self, size, format, *argv):
         if format == "repr":
