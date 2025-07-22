@@ -475,6 +475,7 @@ class LPF2(object):
     # -----   Start everything up
 
     def connect(self):
+        assert len(self.modes) > 0, "No modes (commands) defined"
         fast_uart_hub = False
         self.init_pins()
         self.wrt_tx_pin(1, 5)  # Say hello!
