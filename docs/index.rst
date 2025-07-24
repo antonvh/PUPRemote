@@ -1,6 +1,10 @@
 PUPRemote documentation
 =======================
 
+PUPRemote emulates the LEGO sensor protocol. You can define custom sensors in Pybricks, SPIKE2,
+and Robot Inventor. In SPIKE3 you need to exactly emulate existing LEGO sensors. This is
+also possible with PUPRemote.
+
 Use this library to communicate from a pyboard like OpenMV or LMS-ESP32 
 as a Powered UP (PUP) Device with LEGO smart hubs. 
 It has a PUPRemote library that acts more like RPC (Remote Procedure Calling).

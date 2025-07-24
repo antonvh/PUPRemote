@@ -7,7 +7,7 @@ __status__ = "Production"
 # !! Upload this file into your editor at code.pybricks.com
 
 from pybricks.iodevices import PUPDevice
-import ustruct
+import struct
 
 
 FILL = 0x10
@@ -67,10 +67,11 @@ class BluePad:
         Decodes the buttons pressed and converts the buttons to a string
         containing the pressed buttons ['X','O','[]','Δ']
 
-        :param btns: The word read from the gamepad containing the binary encodeing of pressed buttons
-        : type btns: Word
+        :param btns: The word read from the gamepad containing the binary encodeing of pressed buttons.
+        :type btns: Word
         :param nintendo: Indicates that a nintendo gamepad is used.
-        :return: String with pressed buttons
+        :return: String with pressed buttons.
+        
         """  
         bits_btns=[int(i) for i in bin(btns)[2:]] # convert to binary, remove '0b' 
         bits_btns.reverse()
@@ -87,9 +88,9 @@ class BluePad:
         containing the pressed buttons ['L','R','U','D']
 
         :param btns: The word read from the gamepad containing the binary encoding of pressed dpad-buttons
-        : type btns: Word
-
+        :type btns: Word
         :return: String with pressed dpad-buttons
+        
         """  
         bits_btns=[int(i) for i in bin(btns)[2:]] # convert to binary, remove '0b' 
         bits_btns.reverse()
