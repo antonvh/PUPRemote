@@ -299,7 +299,7 @@ class PUPRemoteSensor(PUPRemote):
         pl = self.encode(
             self.commands[mode][SIZE], self.commands[mode][TO_HUB_FORMAT], *argv
         )
-        self.lpup.load_payload(pl, mode)
+        self.lpup.update_payload(pl, mode)
 
 
 class PUPRemoteHub(PUPRemote):
