@@ -11,7 +11,7 @@ import utime
 try:
     from micropython import const
 except ImportError:
-    def const(i:int) ->int:
+    def const(i):
         return i
     
 from sys import implementation
@@ -41,7 +41,7 @@ MSG_DATA = const(0xC0)  # data command
 MSG_EXT_MODE = const(0x46)
 EXT_MODE_0 = const(0x00)
 EXT_MODE_8 = const(0x08)  # only used for extended mode > 7
-CMD_LLL_SHIFT = 3
+CMD_LLL_SHIFT = const(3)
 MSG_INFO_PLUS8 = const(0x20)
 
 LEN_4 = const(2 << CMD_LLL_SHIFT)
