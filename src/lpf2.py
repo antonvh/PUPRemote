@@ -273,6 +273,12 @@ class LPF2(object):
             self.load_payload(data, mode)
         self.write(self.payloads[mode])
 
+    def update_payload(self, data, mode):
+        if mode == self.current_mode:
+            self.send_payload(data, mode)
+        else:
+            self.load_payload(data, mode)
+
     # ----- comm stuff
 
     def flush(self):
