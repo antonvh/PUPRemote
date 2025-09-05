@@ -1,0 +1,28 @@
+site_name: PUPRemote Documentation
+site_url: https://libs.antonsmindstorms.com/PUPRemote/
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.sections
+    - search.highlight
+    - content.code.copy
+extra:
+  repo_name: antonvh/PUPRemote
+  repo_url: https://github.com/antonvh/PUPRemote
+nav:
+  - Home: index.md
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_root_heading: true
+            show_source: true
+  - search
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
