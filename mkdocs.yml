@@ -20,11 +20,11 @@ plugins:
           options:
             show_root_heading: true
             show_source: true
-      setup_commands:
-        - import sys, os
-        - sys.path.insert(0, os.path.abspath("."))         # root
-        - sys.path.insert(0, os.path.abspath("./docs"))    # docs folder
-        - sys.path.insert(0, os.path.abspath("./src"))     # src folder
+          setup:
+            paths:
+              - .
+              - ./docs
+              - ./src
   - search
 
 markdown_extensions:
