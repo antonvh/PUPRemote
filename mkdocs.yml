@@ -20,11 +20,7 @@ plugins:
           options:
             show_root_heading: true
             show_source: true
-          setup:
-            paths:
-              - .
-              - ./docs
-              - ./src
+          
   - search
 
 markdown_extensions:
