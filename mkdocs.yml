@@ -17,6 +17,9 @@ plugins:
   - search
   - mkdocs-autoapi:
       autoapi_dir: src
+      autoapi_ignore:
+        - lpf2.py
+        - pybricks_blocks_boilerplate.py
   - mkdocstrings:
       handlers:
         python:
