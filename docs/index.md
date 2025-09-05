@@ -17,7 +17,7 @@ PUPRemoteHub
 ::: pupremote.PUPRemoteHub
 
 PUPRemoteSensor
-::: src.pupremote.PUPRemoteSensor
+::: pupremote.PUPRemoteSensor
 
 ## Autoapi
 
