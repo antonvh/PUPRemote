@@ -14,14 +14,20 @@ nav:
   - Home: index.md
 
 plugins:
+  - search
+  - mkdocs-autoapi:
+      autoapi_dir: src
   - mkdocstrings:
       handlers:
         python:
+          paths:
+            - src
           options:
             show_root_heading: true
             show_source: true
+            docstring_style: sphinx
           
-  - search
+
 
 markdown_extensions:
   - admonition

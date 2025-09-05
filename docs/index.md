@@ -11,19 +11,13 @@ TODO
 ## API Reference
 
 PUPRemote
-::: src.pupremote
+::: pupremote
 
 PUPRemoteHub
-::: src.pupremote.PUPRemoteHub
+::: pupremote.PUPRemoteHub
 
 PUPRemoteSensor
 ::: src.pupremote.PUPRemoteSensor
 
-SPIKE_COLOR
-::: src.pupremote.SPIKE_COLOR
+## Autoapi
 
-SPIKE_ULTRASONIC
-::: src.pupremote.SPIKE_ULTRASONIC
-
-WEDO_ULTRASONIC
-::: src.pupremote.WEDO_ULTRASONIC
