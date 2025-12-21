@@ -1,16 +1,14 @@
-# Copy this file to the LMS-ESP32 with Thonny and name it main.py
-# Copy pupremote.py and lpf2.py to the LMS-ESP32 with Thonny
+# Copy this file to the LMS-ESP32 with Thonny or ViperIDE and name it main.py
 # Connect the LMS-ESP32 to the SPIKE Prime hub though port A
-# Run this program on the LMS-ESP32 by rebooting it (ctrl-D in Thonny)
-
+# Run this program on the LMS-ESP32 by rebooting it (ctrl-D)
 
 ### Setup pupremote code
 from pupremote import  PUPRemoteSensor, SPIKE_ULTRASONIC
 
 def msg(*argv):
     if argv!=():
-        print(argv)
-    return str(value)
+        print(*argv)
+    return argv
 
 value=0
 def num(*argv):
@@ -33,12 +31,11 @@ def sdata(*argv):
     return sm_data
 
 
-p=PUPRemoteSensor(sensor_id=SPIKE_ULTRASONIC, power = True)
+p=PUPRemoteSensor(power = True, max_packet_size=16)
 p.add_command('msg',"repr","repr")
 p.add_command('num',from_hub_fmt="3b", to_hub_fmt="3b")
 p.add_command('sdata',from_hub_fmt="16B", to_hub_fmt="16B")
 
-### End of pupremote setup code
 
 ### Main loop
 while(True):
