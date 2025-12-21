@@ -2,7 +2,7 @@
 # Includes async/multitask support for concurrent hub-side operations
 #
 # This is a lightweight version (44% smaller than pupremote.py) optimized for:
-# - Pybricks block code: 
+# - Pybricks block code:
 #      - import sync functions connect(), add_command(), call()
 #      - import async functions call_multitask(), process_calls()
 # - Pybricks multitask support for concurrent operations
@@ -23,6 +23,11 @@ from pybricks.tools import wait, run_task
 from micropython import const
 
 MAX_PKT = const(16)
+
+# Result holder indices
+DONE = const(0)
+RESULT = const(1)
+ERROR = const(2)
 
 # Dictionary keys
 NAME = const(0)
@@ -70,19 +75,24 @@ def add_command(name, to_hub, from_hub):
         print("Use the connect command before adding a command")
         raise
 
+
 def call_multitask(*args, **kwargs):
     try:
         return pr.call_multitask(*args, **kwargs)
     except:
-        print("Use the connect & add_channel or add_command blocks before call_multitask")
+        print(
+            "Use the connect & add_channel or add_command blocks before call_multitask"
+        )
         raise
-    
+
+
 def process_calls():
     try:
         return pr.process_calls()
     except:
         print("Use the connect command before starting process_calls")
         raise
+
 
 class PUPRemote:
     def __init__(self, max_packet_size=MAX_PKT):
@@ -160,7 +170,7 @@ class PUPRemote:
 
     def decode(self, fmt: str, data: bytes):
         if fmt == "repr":
-            clean = data.rstrip(b'\x00')
+            clean = data.rstrip(b"\x00")
             return (eval(clean),) if clean else ("",)
         else:
             size = struct.calcsize(fmt)
@@ -248,7 +258,11 @@ class PUPRemoteHub(PUPRemote):
                 ), "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
             self.pup_device.write(
-                mode, [((i + 128) & 0xFF) - 128 for i in tuple(payl + b"\x00" * (size - len(payl)))]
+                mode,
+                [
+                    ((i + 128) & 0xFF) - 128
+                    for i in tuple(payl + b"\x00" * (size - len(payl)))
+                ],
             )
             wait(wait_ms)
 
@@ -277,15 +291,15 @@ class PUPRemoteHub(PUPRemote):
                 "Start 'process_calls' as a seperate task (coroutine) before using 'call_multitask()'"
             )
 
-        result_holder = {"done": False, "result": None, "error": None}
+        result_holder = [False, None, None]  # [done, result, error]
         self._queue.append((command_name, argv, wait_ms, result_holder))
 
-        while not result_holder["done"]:
+        while not result_holder[DONE]:
             await wait(1)  # cooperative multitasking
 
-        if result_holder["error"]:
-            raise result_holder["error"]
-        return result_holder["result"]
+        if result_holder[ERROR]:
+            raise result_holder[ERROR]
+        return result_holder[RESULT]
 
     async def _execute_call(self, mode_name: str, *argv, wait_ms=0):
         mode = self.modes[mode_name]
@@ -297,7 +311,11 @@ class PUPRemoteHub(PUPRemote):
                 assert len(argv) == num_args, "Args mismatch in {}".format(mode_name)
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
             await self.pup_device.write(
-                mode, [((i + 128) & 0xFF) - 128 for i in tuple(payl + b"\x00" * (size - len(payl)))]
+                mode,
+                [
+                    ((i + 128) & 0xFF) - 128
+                    for i in tuple(payl + b"\x00" * (size - len(payl)))
+                ],
             )
             await wait(wait_ms)
 
@@ -323,12 +341,12 @@ class PUPRemoteHub(PUPRemote):
                     result = await self._execute_call(
                         command_name, *argv, wait_ms=wait_ms
                     )
-                    result_holder["result"] = result
+                    result_holder[RESULT] = result
                 except Exception as e:
-                    result_holder["error"] = e
+                    result_holder[ERROR] = e
                     print(e)
                     raise
                 finally:
-                    result_holder["done"] = True
+                    result_holder[DONE] = True
                     running = False
             await wait(1)

@@ -46,6 +46,11 @@ MAX_PKT = const(16)
 MAX_COMMANDS = const(16)
 MAX_COMMAND_QUEUE_LENGTH = const(10)
 
+# Result holder indices
+DONE = const(0)
+RESULT = const(1)
+ERROR = const(2)
+
 # Dictionary keys
 NAME = const(0)
 SIZE = const(1)
@@ -69,10 +74,10 @@ CHANNEL = const(1)
 class PUPRemote:
     """
     Base class for PUPRemoteHub and PUPRemoteSensor. Don't use this class directly.
-    
-    Defines a list of commands and their formats. Contains encoding/decoding 
+
+    Defines a list of commands and their formats. Contains encoding/decoding
     functions for communication between hub and sensor.
-    
+
     :param max_packet_size: Maximum packet size in bytes, defaults to 16 for Pybricks compatibility.
     :type max_packet_size: int
     """
@@ -271,22 +276,22 @@ class PUPRemoteSensor(PUPRemote):
 
         if result is None:
             assert num_args <= 0, "{}() did not return value(s)".format(
-                        self.commands[mode][NAME]
-                    )
+                self.commands[mode][NAME]
+            )
         else:
             if not isinstance(result, tuple):
                 result = (result,)
             if num_args >= 0:
                 assert num_args == len(
-                            result
-                        ), "{}() returned {} value(s) instead of expected {}".format(
-                            self.commands[mode][NAME], len(result), num_args
-                        )
+                    result
+                ), "{}() returned {} value(s) instead of expected {}".format(
+                    self.commands[mode][NAME], len(result), num_args
+                )
             pl = self.encode(
-                        self.commands[mode][SIZE],
-                        self.commands[mode][TO_HUB_FORMAT],
-                        *result,
-                    )
+                self.commands[mode][SIZE],
+                self.commands[mode][TO_HUB_FORMAT],
+                *result,
+            )
             self.lpup.send_payload(pl, mode)
 
     async def process_async(self, interval_ms: int = 50):
@@ -297,7 +302,7 @@ class PUPRemoteSensor(PUPRemote):
         - A heartbeat loop that maintains communication at a minimum frequency of 15 Hz
         - A callback processing loop that handles queued callbacks
 
-        :param interval_ms: The interval in milliseconds between heartbeats. Must be maximum 
+        :param interval_ms: The interval in milliseconds between heartbeats. Must be maximum
                             66ms to maintain minimum 15 Hz frequency. Defaults to 50ms.
         :type interval_ms: int
         :return: None. Runs until both tasks complete or are cancelled.
@@ -305,10 +310,10 @@ class PUPRemoteSensor(PUPRemote):
         :raises asyncio.CancelledError: If either task is cancelled during execution.
 
         .. note::
-           This is a long-running coroutine that should be the main entry point for 
+           This is a long-running coroutine that should be the main entry point for
            asynchronous operation. It will run indefinitely until explicitly cancelled.
         """
-        
+
         hb_task = asyncio.create_task(self._heartbeat_loop(interval_ms))
         cb_task = asyncio.create_task(self._process_callbacks())
         await asyncio.gather(hb_task, cb_task)
@@ -452,15 +457,15 @@ class PUPRemoteHub(PUPRemote):
                 "Start 'process_calls' as a seperate task (coroutine) before using 'call_multitask()'"
             )
 
-        result_holder = {"done": False, "result": None, "error": None}
+        result_holder = [False, None, None]  # [done, result, error]
         self._queue.append((command_name, argv, wait_ms, result_holder))
 
-        while not result_holder["done"]:
+        while not result_holder[DONE]:
             await wait(1)  # cooperative multitasking
 
-        if result_holder["error"]:
-            raise result_holder["error"]
-        return result_holder["result"]
+        if result_holder[ERROR]:
+            raise result_holder[ERROR]
+        return result_holder[RESULT]
 
     async def _execute_call(self, mode_name: str, *argv, wait_ms=0):
         mode = self.modes[mode_name]
@@ -500,13 +505,13 @@ class PUPRemoteHub(PUPRemote):
                     result = await self._execute_call(
                         command_name, *argv, wait_ms=wait_ms
                     )
-                    result_holder["result"] = result
+                    result_holder[RESULT] = result
                 except Exception as e:
-                    result_holder["error"] = e
+                    result_holder[ERROR] = e
                     print(e)
                     raise
                 finally:
-                    result_holder["done"] = True
+                    result_holder[DONE] = True
                     running = False
             await wait(1)
 
@@ -559,15 +564,14 @@ if __name__ == "__main__":
         # -------------------------------------------------
         # Example hub-side program using process_async
         # -------------------------------------------------
-        
+
         # This example reads a 'value' channel every 50ms,
-        # and calls a 'reset' call every 2 seconds to reset the counter 
+        # and calls a 'reset' call every 2 seconds to reset the counter
         # on the sensor side.
-        
+
         # Race=True makes sure the program ends when one of the user tasks/loops is done.
         # and process_calls() does not keep the program running forever.
-        
-        
+
         from pybricks.parameters import Port
         from pybricks.tools import multitask, run_task
 
@@ -590,7 +594,7 @@ if __name__ == "__main__":
                 print(val)
 
         async def main():
-            # race=True ensures the program finishes when 
+            # race=True ensures the program finishes when
             # the first user thread is done.
             await multitask(main1(), main2(), pr.process_calls(), race=True)
 
