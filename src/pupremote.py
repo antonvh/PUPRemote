@@ -72,14 +72,13 @@ CHANNEL = const(1)
 
 
 class PUPRemote:
-    """
-    Base class for PUPRemoteHub and PUPRemoteSensor. Don't use this class directly.
+    """Base class for PUPRemoteHub and PUPRemoteSensor. Don't use this class directly.
 
     Defines a list of commands and their formats. Contains encoding/decoding
     functions for communication between hub and sensor.
 
-    :param max_packet_size: Maximum packet size in bytes, defaults to 16 for Pybricks compatibility.
-    :type max_packet_size: int
+    Args:
+        max_packet_size: Maximum packet size in bytes, defaults to 16 for Pybricks compatibility.
     """
 
     def __init__(self, max_packet_size=MAX_PKT):
@@ -88,18 +87,17 @@ class PUPRemote:
         self.max_packet_size = max_packet_size
 
     def add_channel(self, mode_name: str, to_hub_fmt: str = ""):
-        """
-        Define a data channel to read on the hub. Use this function with identical parameters on both
-        the sensor and the hub. You can call a channel like a command, but to update the data
-        on the sensor side, you need to `update_channel(<name>, *args)`.
+        """Define a data channel to read on the hub.
 
-        :param mode_name: The name of the mode you defined on the sensor side.
-        :type mode_name: str
-        :param to_hub_fmt: The format string of the data sent from the sensor
-            to the hub. Use 'repr' to receive any python object. Or use a struct format string,
-            to receive a fixed size payload. See https://docs.python.org/3/library/struct.html
+        Use this function with identical parameters on both the sensor and the hub.
+        You can call a channel like a command, but to update the data on the sensor
+        side, you need to `update_channel(<name>, *args)`.
 
-        :type to_hub_fmt: str
+        Args:
+            mode_name: The name of the mode you defined on the sensor side.
+            to_hub_fmt: The format string of the data sent from the sensor to the hub.
+                Use 'repr' to receive any python object. Or use a struct format string.
+                See https://docs.python.org/3/library/struct.html
         """
         self.add_command(mode_name, to_hub_fmt=to_hub_fmt, command_type=CHANNEL)
 
@@ -110,19 +108,17 @@ class PUPRemote:
         from_hub_fmt: str = "",
         command_type=CALLBACK,
     ):
-        """Define a remote call. Use this function with identical parameters on both
-        the sensor and the hub.
+        """Define a remote call.
 
-        :param mode_name: The name of the mode you defined on the sensor side.
-        :type mode_name: str
-        :param to_hub_fmt: The format string of the data sent from the sensor
-            to the hub. Use 'repr' to receive any python object. Or use a struct format string,
-            to receive a fixed size payload. See https://docs.python.org/3/library/struct.html
+        Use this function with identical parameters on both the sensor and the hub.
 
-        :type to_hub_fmt: str
-        :param from_hub_fmt: The format string of the data sent from the hub
-        :type from_hub_fmt: str
-
+        Args:
+            mode_name: The name of the mode you defined on the sensor side.
+            to_hub_fmt: The format string of the data sent from the sensor to the hub.
+                Use 'repr' to receive any python object. Or use a struct format string.
+                See https://docs.python.org/3/library/struct.html
+            from_hub_fmt: The format string of the data sent from the hub.
+            command_type: CALLBACK or CHANNEL (internal).
         """
         if to_hub_fmt == "repr" or from_hub_fmt == "repr":
             msg_size = self.max_packet_size
@@ -180,20 +176,15 @@ class PUPRemote:
 
 
 class PUPRemoteSensor(PUPRemote):
-    """
-    Class to communicate with a PUPRemoteHub. Use this class on the sensor side,
-    on any board that runs MicroPython. You can enable 8V power on the M+ wire,
-    so the buck converter on the SPIKE-OPENMV or LMS-ESP32 board side can supply high
-    currents (op to 1700mA) to your appliances.
+    """Emulate a PUPRemote sensor for communication with a hub.
 
-    :param sensor_id: The id of the sensor of the sensor to emulate, defaults to 62.
-    :type sensor_id: int
-    :param power: Set to True if the PUPRemoteHub needs 8V power on M+ wire, defaults to False.
-    :type power: bool
-    :param platform: Set to ESP32 or OPENMV, defaults to ESP32.
-    :type platform: int
-    :param max_packet_size: Set to max 32 bytes of payload, defaults to 16 for Pybricks compatibility.
-    :type max_packet_size: int
+    Use this class on the sensor side (ESP32, OpenMV, etc.). Enables 8V power on
+    the M+ wire if configured.
+
+    Args:
+        sensor_id: The id of the sensor to emulate, defaults to SPIKE_ULTRASONIC.
+        power: Set to True to enable 8V power on M+ wire, defaults to False.
+        max_packet_size: Set to 16 for Pybricks compatibility, defaults to 32.
     """
 
     def __init__(
@@ -295,36 +286,31 @@ class PUPRemoteSensor(PUPRemote):
             self.lpup.send_payload(pl, mode)
 
     async def process_async(self, interval_ms: int = 50):
+        """Start async heartbeat and callback processing.
+
+        Runs two asynchronous tasks concurrently:
+        - Heartbeat loop maintaining communication at minimum 15 Hz
+        - Callback processing loop handling queued commands
+
+        Args:
+            interval_ms: The interval in milliseconds between heartbeats.
+                Must be maximum 66ms to maintain minimum 15 Hz frequency. Defaults to 50ms.
+
+        Raises:
+            asyncio.CancelledError: If either task is cancelled during execution.
         """
-        Start both heartbeat and callback processing tasks concurrently.
-
-        This method creates and runs two asynchronous tasks in parallel:
-        - A heartbeat loop that maintains communication at a minimum frequency of 15 Hz
-        - A callback processing loop that handles queued callbacks
-
-        :param interval_ms: The interval in milliseconds between heartbeats. Must be maximum
-                            66ms to maintain minimum 15 Hz frequency. Defaults to 50ms.
-        :type interval_ms: int
-        :return: None. Runs until both tasks complete or are cancelled.
-        :rtype: None
-        :raises asyncio.CancelledError: If either task is cancelled during execution.
-
-        .. note::
-           This is a long-running coroutine that should be the main entry point for
-           asynchronous operation. It will run indefinitely until explicitly cancelled.
-        """
-
         hb_task = asyncio.create_task(self._heartbeat_loop(interval_ms))
         cb_task = asyncio.create_task(self._process_callbacks())
         await asyncio.gather(hb_task, cb_task)
 
     def process(self):
-        """
-        Process the commands. Call this function in your main loop, preferably at least once every 20ms.
-        It will handle the communication with the LEGO Hub, connect to it if needed,
-        and call the registered commands.
+        """Process commands and communication with the hub.
 
-        :return: True if connected to the hub, False otherwise.
+        Call this function in your main loop, preferably at least once every 20ms.
+        Handles hub communication, auto-connect, and command invocation.
+
+        Returns:
+            True if connected to the hub, False otherwise.
         """
         data = self.lpup.heartbeat()
         if data is not None:
@@ -337,11 +323,13 @@ class PUPRemoteSensor(PUPRemote):
         return self.lpup.connected
 
     def update_channel(self, mode_name: str, *argv):
-        """Update values in 'sensor' memory, so the hub can retrieve them with call().
-        This is simpler than defining a function that is called remotely from the hub.
+        """Update values in sensor memory for hub retrieval.
 
-        :param mode_name: mode name you defined when you used `add_channel()`
-        :type mode_name: str
+        Simpler alternative to defining a function called from the hub.
+
+        Args:
+            mode_name: Mode name you defined when you used `add_channel()`.
+            *argv: Values to update.
         """
         mode = self.modes[mode_name]
 
@@ -357,15 +345,14 @@ class PUPRemoteSensor(PUPRemote):
 
 
 class PUPRemoteHub(PUPRemote):
-    """
-    Class to communicate with a PUPRemoteSensor. Use this class on the hub side,
-    on any hub that runs Pybricks. Copy the commands you defined on the sensor side
-    to the hub side.
+    """Communicate with a PUPRemoteSensor from a Pybricks hub.
 
-    :param port: The port to which the PUPRemoteSensor is connected.
-    :type port: Port (Example: Port.A)
-    :param max_packet_size: Set to 16 for Pybricks compatibility, defaults to 32.
-    :type max_packet_size: int
+    Use on the hub side running Pybricks. Copy the commands you defined on the sensor
+    side to the hub side using add_command() and add_channel().
+
+    Args:
+        port: The port to which the PUPRemoteSensor is connected (e.g., Port.A).
+        max_packet_size: Set to 16 for Pybricks compatibility, defaults to 32.
     """
 
     def _int8_to_uint8(self, arr):
@@ -400,18 +387,19 @@ class PUPRemoteHub(PUPRemote):
         ), f"Different parameter size than on remote side. Check formats."
 
     def call(self, mode_name: str, *argv, wait_ms=0):
-        """
-        Call a remote function on the sensor side with the mode_name you defined on both sides.
+        """Call a remote function on the sensor side.
 
-        :param mode_name: The name of the mode you defined on the sensor side.
-        :type mode_name: str
-        :param argv: As many arguments as you need to pass to the remote function.
-        :type argv: Any
-        :param wait_ms: The time to wait before reading after sending the call payload.
-            Only applicable if there is a payload outbound from the hub. So not for channels or
-            functions without parameters.
-            Defaults to 0ms. A good value is `struct.calcsize(from_hub_fmt) * 1.5` (ms)
-        :type wait_ms: int
+        Args:
+            mode_name: The name of the mode you defined on both sides.
+            *argv: Arguments to pass to the remote function.
+            wait_ms: Time to wait before reading after sending (optional).
+                Defaults to 0ms. A good value is `struct.calcsize(from_hub_fmt) * 1.5` (ms)
+
+        Returns:
+            The return value from the remote function, or a tuple of values.
+
+        Raises:
+            AssertionError: If called during a multitask operation.
         """
         assert (
             not run_task()
@@ -440,17 +428,17 @@ class PUPRemoteHub(PUPRemote):
         return result[0] if len(result) == 1 else result
 
     async def call_multitask(self, command_name: str, *argv, wait_ms=0):
-        """
-        Calls a remote function.
-        This is the async version for use with Pybricks Multitask.
-        Make sure to run 'process_calls()' as coroutine.
+        """Call a remote function asynchronously for use with Pybricks multitask.
 
-        :param command_name: The name of the command
-        :type command_name: string
-        :param Optionally, you can pass the <n_from_hub> number of parameters.
+        Make sure to run process_calls() as a separate task before using this.
 
-        :return: It will return a single value, or a list, depending on the value of <n_to_hub>.
+        Args:
+            command_name: The name of the command.
+            *argv: Arguments to pass to the remote function.
+            wait_ms: Time to wait before reading after sending. Defaults to 0ms.
 
+        Returns:
+            The return value from the remote function, or a tuple of values.
         """
         if not self._multitask_loop_running:
             raise AssertionError(
