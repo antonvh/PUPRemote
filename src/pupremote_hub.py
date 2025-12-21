@@ -4,11 +4,11 @@
 # This is a lightweight version (44% smaller than pupremote.py) optimized for:
 # - Pybricks block code:
 #      - import sync functions connect(), add_command(), call()
-#      - import async functions call_multitask(), process_calls()
+#      - import async functions call_multitask(), process_async()
 # - Pybricks multitask support for concurrent operations
 # - Low memory footprint on Pybricks hubs
 # - Hub-side only (no sensor emulation code)
-# - Async support via call_multitask() and process_calls()
+# - Async support via call_multitask() and process_async()
 # - Compatible with Pybricks multitask for concurrent operations
 
 __author__ = "Anton Vanhoucke & Ste7an"
@@ -86,11 +86,11 @@ def call_multitask(*args, **kwargs):
         raise
 
 
-def process_calls():
+def process_async():
     try:
-        return pr.process_calls()
+        return pr.process_async()
     except:
-        print("Use the connect command before starting process_calls")
+        print("Use the connect command before starting process_async")
         raise
 
 
@@ -282,7 +282,7 @@ class PUPRemoteHub(PUPRemote):
     async def call_multitask(self, command_name: str, *argv, wait_ms=0):
         """Call a remote function asynchronously for use with Pybricks multitask.
 
-        Make sure to run process_calls() as a separate task before using this.
+        Make sure to run process_async() as a separate task before using this.
 
         Args:
             command_name: The name of the command.
@@ -294,7 +294,7 @@ class PUPRemoteHub(PUPRemote):
         """
         if not self._multitask_loop_running:
             raise AssertionError(
-                "Start 'process_calls' as a seperate task (coroutine) before using 'call_multitask()'"
+                "Start 'process_async' as a seperate task (coroutine) before using 'call_multitask()'"
             )
 
         result_holder = [False, None, None]  # [done, result, error]
@@ -332,7 +332,7 @@ class PUPRemoteHub(PUPRemote):
         # Convert tuple size 1 to single value
         return result[0] if len(result) == 1 else result
 
-    async def process_calls(self):
+    async def process_async(self):
         """
         Process multitask MicroPUP calls in a queue to avoid EAGAIN or IOERR.
         """

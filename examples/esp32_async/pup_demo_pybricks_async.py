@@ -21,6 +21,7 @@ async def hello():
         print(result)
         await wait(500)
 
+
 async def cntr():
     while True:
         # Call remote function 'cntr' asynchronously
@@ -29,9 +30,11 @@ async def cntr():
         print(result)
         await wait(333)
 
+
 async def main():
-    # race=True ensures the program finishes when 
+    # race=True ensures the program finishes when
     # the first user thread is done.
-    await multitask(p.process_calls(), hello(), cntr(), race=True)
+    await multitask(p.process_async(), hello(), cntr(), race=True)
+
 
 run_task(main())

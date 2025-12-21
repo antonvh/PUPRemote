@@ -430,7 +430,7 @@ class PUPRemoteHub(PUPRemote):
     async def call_multitask(self, command_name: str, *argv, wait_ms=0):
         """Call a remote function asynchronously for use with Pybricks multitask.
 
-        Make sure to run process_calls() as a separate task before using this.
+        Make sure to run process_async() as a separate task before using this.
 
         Args:
             command_name: The name of the command.
@@ -442,7 +442,7 @@ class PUPRemoteHub(PUPRemote):
         """
         if not self._multitask_loop_running:
             raise AssertionError(
-                "Start 'process_calls' as a seperate task (coroutine) before using 'call_multitask()'"
+                "Start 'process_async' as a seperate task (coroutine) before using 'call_multitask()'"
             )
 
         result_holder = [False, None, None]  # [done, result, error]
@@ -478,7 +478,7 @@ class PUPRemoteHub(PUPRemote):
         # Convert tuple size 1 to single value
         return result[0] if len(result) == 1 else result
 
-    async def process_calls(self):
+    async def process_async(self):
         """
         Process multitask MicroPUP calls in a queue to avoid EAGAIN or IOERR.
         """
@@ -558,7 +558,7 @@ if __name__ == "__main__":
         # on the sensor side.
 
         # Race=True makes sure the program ends when one of the user tasks/loops is done.
-        # and process_calls() does not keep the program running forever.
+        # and process_async() does not keep the program running forever.
 
         from pybricks.parameters import Port
         from pybricks.tools import multitask, run_task
@@ -584,6 +584,6 @@ if __name__ == "__main__":
         async def main():
             # race=True ensures the program finishes when
             # the first user thread is done.
-            await multitask(main1(), main2(), pr.process_calls(), race=True)
+            await multitask(main1(), main2(), pr.process_async(), race=True)
 
         run_task(main())
