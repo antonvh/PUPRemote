@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pupremote"
+version = "2.1.1"
+description = "Emulate LEGO Powered Up sensors from MicroPython boards with RPC-style API"
+readme = "README.md"
+license = "GPL-3.0"
+authors = [
+    {name = "Anton Vanhoucke & Ste7an", email = "anton@antonsmindstorms.com"}
+]
+keywords = ["lego", "pup", "powered-up", "sensor", "pybricks", "micropython", "esp32", "openmv"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: Implementation :: MicroPython",
+    "Topic :: Education",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Hardware",
+]
+requires-python = ">=3.6"
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/antonvh/PUPRemote"
+Repository = "https://github.com/antonvh/PUPRemote.git"
+Documentation = "https://github.com/antonvh/PUPRemote"
+Issues = "https://github.com/antonvh/PUPRemote/issues"
+
+[tool.setuptools]
+py-modules = ["pupremote", "lpf2"]
+package-dir = {"" = "src"}
+

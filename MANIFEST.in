@@ -1,0 +1,8 @@
+recursive-include examples *.py *.md
+recursive-include docs *.md *.rst
+recursive-include tests *.py *.md
+include README.md
+include LICENSE.txt
+include VALIDATION_REPORT.md
+include QUICK_REFERENCE.md
+recursive-include img *

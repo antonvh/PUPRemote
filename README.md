@@ -1,6 +1,5 @@
-<p align="center">
-  <img alt="PUPRemote logo" src="img/pupremote.png" width="200">
-</p>
+<div align="center">
+  <img alt="PUPRemote logo" src="https://raw.githubusercontent.com/antonvh/PUPRemote/main/img/pupremote.png" width="200">
 
 # PUPRemote
 
@@ -9,6 +8,9 @@
 ![Platforms: Pybricks | SPIKE2 | Robot Inventor](https://img.shields.io/badge/Platforms-Pybricks%20%7C%20SPIKE2%20%7C%20Robot%20Inventor-red)
 
 PUPRemote lets microcontrollers present themselves as LEGO Powered Up sensors. It includes a low-level LPF2 emulator and a higher-level remote-procedure-style API for quick sensor prototypes.
+
+</div>
+
 
 ## Table of Contents
 
