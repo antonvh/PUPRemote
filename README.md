@@ -1,28 +1,127 @@
+<p align="center">
+  <img alt="PUPRemote logo" src="img/pupremote.png" width="200">
+</p>
+
 # PUPRemote
 
-Use this library to communicate as a Powered UP (PUP) Device with LEGO smart hubs. It has a basic PUPDeviceEmulator and a higher-level PUPRemote library that acts more like RPC (Remote Procedure Calling).
+[![License: GPLv3](https://img.shields.io/github/license/antonvh/PUPRemote?color=blue)](https://github.com/antonvh/PUPRemote/blob/main/LICENSE.txt)
+![MicroPython Compatible](https://img.shields.io/badge/MicroPython-Compatible-brightgreen)
+![Platforms: Pybricks | SPIKE2 | Robot Inventor](https://img.shields.io/badge/Platforms-Pybricks%20%7C%20SPIKE2%20%7C%20Robot%20Inventor-red)
 
-## Installation 
+PUPRemote lets microcontrollers present themselves as LEGO Powered Up sensors. It includes a low-level LPF2 emulator and a higher-level remote-procedure-style API for quick sensor prototypes.
 
-### ESP32
+## Table of Contents
+- [PUPRemote](#pupremote)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Supported Platforms](#supported-platforms)
+  - [Installation](#installation)
+    - [LMS-ESP32 firmware](#lms-esp32-firmware)
+    - [OpenMV](#openmv)
+    - [Pybricks hubs](#pybricks-hubs)
+  - [Quick Start](#quick-start)
+    - [LMS-ESP32 demo](#lms-esp32-demo)
+    - [OpenMV demo](#openmv-demo)
+    - [Pybricks demo](#pybricks-demo)
+  - [Compatibility Notes](#compatibility-notes)
+  - [Project Structure](#project-structure)
+  - [Contributing](#contributing)
+  - [License](#license)
 
-- load lpf2.py in flash
-- load pupremote.py in flash
-- copy demo_esp32.py to main.py and reset or run manually from REPL
+## Features
+- Emulate LEGO LPF2 sensors from MicroPython boards
+- Higher-level RPC-style API (`PUPRemoteSensor`, `PUPRemoteHub`)
+- Works with Pybricks, SPIKE 2, and Robot Inventor hubs
+- Example scripts for LMS-ESP32, OpenMV, and Pybricks
+- Optional lightweight `pupremote_hub.py` for Pybricks-only deployments
 
-### Pybricks
+## Supported Platforms
+- LMS-ESP32 firmware (bundles `pupremote.py` and `lpf2.py`)
+- OpenMV (copy `pupremote.py` and `lpf2.py` onto the board)
+- Pybricks hubs (use the smaller `pupremote_hub.py` when space matters)
+- Other MicroPython-capable boards with LPF2 physical connection
 
-- import pupremote.py
-- import demo_pybricks_inventorhub or _technichub
+## Installation
 
-## Compatibility with Pybricks
-If you get checksum errors it could be due to a known issue with 32 byte packet size in Pybricks. Pass max_packet_size=16 when instantiating PUPRemoteHub and PUPRemoteSensor classes to work around this issue.
+### LMS-ESP32 firmware
+1. The firmware already contains `pupremote.py` and `lpf2.py`.
+2. Copy an example (for instance `examples/esp32_dummy_data/pup_demo_esp32.py`) to the board as `main.py`.
+3. Connect the LMS-ESP32 to your hub (e.g., SPIKE Prime port A) and reboot.
+
+### OpenMV
+1. Copy `src/pupremote.py` and `src/lpf2.py` to the OpenMV board.
+2. Deploy an example such as `examples/openmv_simple/main.py`.
+3. Run from the OpenMV IDE or reboot to start.
+
+### Pybricks hubs
+1. Copy `src/pupremote_hub.py` to the hub (use this smaller file instead of the full `pupremote.py`).
+2. Upload an example such as `examples/openmv_simple/pybricks_spike.py` and adjust imports to `from pupremote_hub import PUPRemoteHub` if needed.
+3. Run the program from the Pybricks app.
+
+## Quick Start
+
+### LMS-ESP32 demo
+Copy to the LMS-ESP32 as `main.py` and reboot:
+
+```python
+# examples/esp32_dummy_data/pup_demo_esp32.py
+from pupremote import PUPRemoteSensor, SPIKE_ULTRASONIC
+
+def msg(*argv):
+		return "demo"
+
+p = PUPRemoteSensor(sensor_id=SPIKE_ULTRASONIC, power=True)
+p.add_command('msg', "repr", "repr")
+
+while True:
+		p.process()
+```
+
+### OpenMV demo
+Copy `src/pupremote.py` and `src/lpf2.py` to the board, then run:
+
+```python
+# examples/openmv_simple/main.py
+from pupremote import PUPRemoteSensor, ESP32, SPIKE_ULTRASONIC
+from time import sleep_ms
+
+p = PUPRemoteSensor(sensor_id=SPIKE_ULTRASONIC, platform=ESP32)
+p.add_channel('cntr', to_hub_fmt="b")
+
+while True:
+		p.process()
+		p.update_channel('cntr', 1)
+		sleep_ms(20)
+```
+
+### Pybricks demo
+Place `src/pupremote_hub.py` on the hub and reference it:
+
+```python
+# examples/openmv_simple/pybricks_spike.py
+from pupremote_hub import PUPRemoteHub
+
+hub = PUPRemoteHub()
+hub.add_channel('demo', to_hub_fmt="b")
+
+while True:
+		hub.process()
+		hub.update_channel('demo', 1)
+```
+
+## Compatibility Notes
+- Pybricks has a known 32-byte packet limitation. Pass `max_packet_size=16` when constructing `PUPRemoteHub` or `PUPRemoteSensor` to avoid checksum errors.
+- For Pybricks, prefer `pupremote_hub.py` to save space (it only contains `PUPRemoteHub`).
+- LMS-ESP32 firmware already includes dependencies; do not re-upload `pupremote.py` or `lpf2.py` there.
+
+## Project Structure
+- `src/` core implementation (`pupremote.py`, `pupremote_hub.py`, `lpf2.py`)
+- `examples/` runnable demos for LMS-ESP32, OpenMV, and Pybricks
+- `docs/` Sphinx docs with API references
+- `img/` project assets (logo)
 
 ## Contributing
+Contributions and protocol refinements are welcome. Please open an issue or PR with your ideas or projects built on PUPRemote.
 
-Please fork and streamline the protocol. There are also some TODOs below you can help with. 
-Please notify us of projects you made with this and share the code!
-
-### TODO
-- Emulate generic sensors
-- Support SPIKE2 and Robot Inventor platforms (Only Pybricks is currently supported)
+## License
+GPL-3.0. See the [LICENSE](LICENSE.txt) file for details.

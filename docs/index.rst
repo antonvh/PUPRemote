@@ -14,15 +14,30 @@ The library is compatible with Pybricks, SPIKE2, and Robot Inventor.
 is also a smaller file, called `pupremote_hub.py` that only contains the `PUPRemoteHub` class.
 So on Pybricks, we suggest using `from pupremote_hub import PUPRemoteHub`
 
-Example
--------
-Run this on OpenMV
+LMS-ESP32 & PybricksExample
+---------------------------
+
+Run this on LMS-ESP32 firmware (the board already includes `pupremote.py` and `lpf2.py`; just place this as `main.py`).
+
+.. literalinclude:: ../examples/esp32_dummy_data/pup_demo_esp32.py
+    :language: python
+
+Run this on Pybricks. Be sure to create a file called `pupremote_hub.py` with
+the contents of `pupremote_hub.py <https://github.com/antonvh/PUPRemote/blob/main/src/pupremote_hub.py>`_.
+
+.. literalinclude:: ../examples/esp32_dummy_data/pup_demo_pybricks.py
+    :language: python
+
+OpenMV & PybricksExample
+------------------------
+
+Run this on OpenMV. Be sure to also copy `pupremote.py` and `lpf2.py` to the device.
 
 .. literalinclude:: ../examples/openmv_simple/main.py
     :language: python
 
-Run this on Pybricks. Be sure to create a file called `pupremote.py` with
-the contents of `pupremote.py <https://github.com/antonvh/PUPRemote/blob/main/src/pupremote.py>`_.
+Run this on Pybricks. Be sure to create a file called `pupremote_hub.py` with
+the contents of `pupremote_hub.py <https://github.com/antonvh/PUPRemote/blob/main/src/pupremote_hub.py>`_.
 
 .. literalinclude:: ../examples/openmv_simple/pybricks_spike.py
     :language: python
@@ -31,9 +46,6 @@ PUPRemote API documentation
 ---------------------------
 
 .. automodule:: pupremote
-    :members:
-
-.. automodule:: lpf2
     :members:
 
 
