@@ -68,20 +68,18 @@ CHANNEL = const(1)
 
 class PUPRemote:
     """
-    Base class for PUPRemoteHub and PUPRemoteSensor. Defines a list of commands
-    and their formats. Contains encoding/decoding functions.
+    Base class for PUPRemoteHub and PUPRemoteSensor. Don't use this class directly.
+    
+    Defines a list of commands and their formats. Contains encoding/decoding 
+    functions for communication between hub and sensor.
+    
+    :param max_packet_size: Maximum packet size in bytes, defaults to 16 for Pybricks compatibility.
+    :type max_packet_size: int
     """
 
     def __init__(self, max_packet_size=MAX_PKT):
-        """
-        :param max_packet_size: Set to 16 for Pybricks compatibility, defaults to 32.
-        :type max_packet_size: int
-        """
-        # Store commands, size and format
         self.commands = []
-        # Store mode names (commands) to look up their index
         self.modes = {}
-        # Optional override for max packet size for Pybricks compatibility
         self.max_packet_size = max_packet_size
 
     def add_channel(self, mode_name: str, to_hub_fmt: str = ""):

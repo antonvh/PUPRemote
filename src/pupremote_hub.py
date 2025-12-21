@@ -1,23 +1,38 @@
 # Trimmed version of pupremote that only runs on Pybricks hubs
+# Includes async/multitask support for concurrent hub-side operations
+#
+# This is a lightweight version (44% smaller than pupremote.py) optimized for:
+# - Low memory footprint on Pybricks hubs
+# - Hub-side only (no sensor emulation code)
+# - Async support via call_multitask() and process_calls()
+# - Compatible with Pybricks multitask for concurrent operations
+#
+# Removed from full pupremote.py:
+# - PUPRemoteSensor class
+# - asyncio, lpf2, deque imports
+# - Sensor-side methods (_heartbeat_loop, _process_callbacks, etc.)
+# - Example code
+
+__author__ = "Anton Vanhoucke & Ste7an"
+__copyright__ = "Copyright 2023,2024 AntonsMindstorms.com"
+__license__ = "GPL"
+__version__ = "2.1"
+__status__ = "Production"
 
 import ustruct as struct
 from pybricks.iodevices import PUPDevice
-from pybricks.tools import wait
+from pybricks.tools import wait, run_task
 from micropython import const
 
-
-MAX_PKT     = const(16)
-#: OpenMV board platform type
-OPENMV      = const(0)
-#: LMS-ESP32 board platform type
-ESP32       = const(1)
+MAX_PKT = const(16)
+MAX_COMMANDS = const(16)
 
 # Dictionary keys
-NAME        = const(0)
-SIZE        = const(1)
-TO_HUB_FORMAT      = const(2)
-FROM_HUB_FORMAT    = const(3)
-CALLABLE    = const(4)
+NAME = const(0)
+SIZE = const(1)
+TO_HUB_FORMAT = const(2)
+FROM_HUB_FORMAT = const(3)
+CALLABLE = const(4)
 ARGS_TO_HUB = const(5)
 ARGS_FROM_HUB = const(6)
 
@@ -31,16 +46,18 @@ SPIKE_ULTRASONIC = const(62)
 CALLBACK = const(0)
 CHANNEL = const(1)
 
+
 def connect(port):
     """
     Connect to LMS-ESP32. Pass Port as a string ('A') or a number (1=Port.A)
     """
     global pr
     if isinstance(port, str):
-        pyport = eval('Port.'+port)
+        pyport = eval("Port." + port)
     if isinstance(port, int):
-        pyport = eval('Port.'+chr(64+port))
+        pyport = eval("Port." + chr(64 + port))
     pr = PUPRemoteHub(pyport)
+
 
 def call(*args):
     try:
@@ -49,12 +66,14 @@ def call(*args):
         print("Use the connect & add_channel or add_command blocks before call")
         raise
 
+
 def add_channel(name, encoding):
     try:
         pr.add_channel(name, encoding)
     except:
         print("Use the connect command before adding a channel")
         raise
+
 
 def add_command(name, to_hub, from_hub):
     try:
@@ -63,21 +82,14 @@ def add_command(name, to_hub, from_hub):
         print("Use the connect command before adding a command")
         raise
 
-class PUPRemote:
-    """
-    Base class for PUPRemoteHub and PUPRemoteSensor. Defines a list of commands
-    and their formats. Contains encoding/decoding functions.
-    """
 
+class PUPRemote:
     def __init__(self, max_packet_size=MAX_PKT):
-        # Store commands, size and format
         self.commands = []
-        # Store mode names (commands) to look up their index
         self.modes = {}
-        # Optional override for max packet size for Pybricks compatibility
         self.max_packet_size = max_packet_size
 
-    def add_channel(self, mode_name: str, to_hub_fmt: str =""):
+    def add_channel(self, mode_name: str, to_hub_fmt: str = ""):
         """
         Define a data channel to read on the hub. Use this function with identical parameters on both
         the sensor and the hub. You can call a channel like a command, but to update the data
@@ -121,16 +133,22 @@ class PUPRemote:
         else:
             size_to_hub_fmt = struct.calcsize(to_hub_fmt)
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
-            msg_size = max(size_to_hub_fmt,size_from_hub_fmt )
-            num_args_to_hub = len(struct.unpack(to_hub_fmt,bytearray(struct.calcsize(to_hub_fmt))))
-            num_args_from_hub = len(struct.unpack(from_hub_fmt,bytearray(struct.calcsize(from_hub_fmt))))
+            msg_size = max(size_to_hub_fmt, size_from_hub_fmt)
+            num_args_to_hub = len(
+                struct.unpack(to_hub_fmt, bytearray(struct.calcsize(to_hub_fmt)))
+            )
+            num_args_from_hub = len(
+                struct.unpack(from_hub_fmt, bytearray(struct.calcsize(from_hub_fmt)))
+            )
 
+        assert len(self.commands) < MAX_COMMANDS, "Command limit exceeded"
+        assert msg_size <= self.max_packet_size, "Payload exceeds maximum packet size"
         self.commands.append(
             {
-            NAME: mode_name,
-            TO_HUB_FORMAT: to_hub_fmt,
-            SIZE: msg_size,
-            ARGS_TO_HUB: num_args_to_hub
+                NAME: mode_name,
+                TO_HUB_FORMAT: to_hub_fmt,
+                SIZE: msg_size,
+                ARGS_TO_HUB: num_args_to_hub,
             }
         )
         if command_type == CALLBACK:
@@ -138,29 +156,28 @@ class PUPRemote:
             self.commands[-1][ARGS_FROM_HUB] = num_args_from_hub
 
         # Build a dictionary of mode names and their index
-        self.modes[mode_name] = len(self.commands)-1
+        self.modes[mode_name] = len(self.commands) - 1
 
     def decode(self, fmt: str, data: bytes):
         if fmt == "repr":
             # Remove trailing zero's (b'\x00') and eval the string
-            clean = data.rstrip(b'\x00')
+            clean = bytearray([c for c in data if c != 0])
             if clean:
                 return (eval(clean),)
             else:
                 # Probably nothing left after stripping zero's
-                return ('',)
+                return ("",)
         else:
             size = struct.calcsize(fmt)
-            return struct.unpack(fmt, data[:size])
+            data = struct.unpack(fmt, data[:size])
+        return data
 
     def encode(self, size, format, *argv):
         if format == "repr":
             s = bytes(repr(*argv), "UTF-8")
         else:
             s = struct.pack(format, *argv)
-
         assert len(s) <= size, "Payload exceeds maximum packet size"
-
         return s
 
 
@@ -175,10 +192,9 @@ class PUPRemoteHub(PUPRemote):
     :param max_packet_size: Set to 16 for Pybricks compatibility, defaults to 32.
     :type max_packet_size: int
     """
-    
-    def _int8_to_uint8(self,arr):
-        return [((i+128)&0xff)-128 for i in arr]
 
+    def _int8_to_uint8(self, arr):
+        return [((i + 128) & 0xFF) - 128 for i in arr]
 
     def __init__(self, port, max_packet_size=MAX_PKT):
         super().__init__(max_packet_size)
@@ -189,17 +205,24 @@ class PUPRemoteHub(PUPRemote):
             self.pup_device = None
             print("Check wiring and remote script. Unable to connect on ", self.port)
             raise
+        # Multitask stuff
+        self._queue = []
+        self._multitask_loop_running = False
 
-    def add_command(self, mode_name, to_hub_fmt = "", from_hub_fmt = "", command_type=CALLBACK):
+    def add_command(
+        self, mode_name, to_hub_fmt="", from_hub_fmt="", command_type=CALLBACK
+    ):
         super().add_command(mode_name, to_hub_fmt, from_hub_fmt, command_type)
         # Check the newly added commands against the advertised modes.
-        modes = self.pup_device.info()['modes']
-        n = len(self.commands)-1 # Zero indexed mode number
+        modes = self.pup_device.info()["modes"]
+        n = len(self.commands) - 1  # Zero indexed mode number
         assert len(self.commands) <= len(modes), "More commands than on remote side"
-        assert mode_name == modes[n][0].rstrip(), \
-            f"Expected '{modes[n][0].rstrip()}' as mode {n}, but got '{mode_name}'"
-        assert self.commands[-1][SIZE] == modes[n][1], \
-            f"Different parameter size than on remote side. Check formats."
+        assert (
+            mode_name == modes[n][0].rstrip()
+        ), f"Expected '{modes[n][0].rstrip()}' as mode {n}, but got '{mode_name}'"
+        assert (
+            self.commands[-1][SIZE] == modes[n][1]
+        ), f"Different parameter size than on remote side. Check formats."
 
     def call(self, mode_name: str, *argv, wait_ms=0):
         """
@@ -209,37 +232,110 @@ class PUPRemoteHub(PUPRemote):
         :type mode_name: str
         :param argv: As many arguments as you need to pass to the remote function.
         :type argv: Any
-        :param wait_ms: The time to wait for the sensor to respond after
-            a write from the hub, defaults to 0ms. This does not delay the read,
-            i.e. when you don't pass any arguments, the read will happen immediately.
-            A good value is the size of the write argument in bytes * 1.5ms
+        :param wait_ms: The time to wait before reading after sending the call payload.
+            Only applicable if there is a payload outbound from the hub. So not for channels or
+            functions without parameters.
+            Defaults to 0ms. A good value is `struct.calcsize(from_hub_fmt) * 1.5` (ms)
         :type wait_ms: int
         """
-    
-        mode = self.modes[mode_name]
-        size = self.commands[mode][SIZE] 
+        assert (
+            not run_task()
+        ), "Use 'call_multitask' instead of 'call', with multiple start blocks or multitask blocks"
 
-        if FROM_HUB_FORMAT in self.commands[mode]: 
+        mode = self.modes[mode_name]
+        size = self.commands[mode][SIZE]
+
+        if FROM_HUB_FORMAT in self.commands[mode]:
             num_args = self.commands[mode][ARGS_FROM_HUB]
             if num_args >= 0:
-                assert len(argv) == num_args, \
-                "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
+                assert (
+                    len(argv) == num_args
+                ), "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
             self.pup_device.write(
                 mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
             )
             wait(wait_ms)
 
-     
-
         data = self.pup_device.read(mode)
-        size=len(data)
-        raw_data = struct.pack('%db'%size,*data)
-        result = self.decode(
-            self.commands[mode][TO_HUB_FORMAT],
-            raw_data)
+        size = len(data)
+        raw_data = struct.pack("%db" % size, *data)
+        result = self.decode(self.commands[mode][TO_HUB_FORMAT], raw_data)
         # Convert tuple size 1 to single value
-        if len(result)==1: 
-            return result[0]
-        else:
-            return result
+        return result[0] if len(result) == 1 else result
+
+    async def call_multitask(self, command_name: str, *argv, wait_ms=0):
+        """
+        Calls a remote function.
+        This is the async version for use with Pybricks Multitask.
+        Make sure to run 'process_calls()' as coroutine.
+
+        :param command_name: The name of the command
+        :type command_name: string
+        :param Optionally, you can pass the <n_from_hub> number of parameters.
+
+        :return: It will return a single value, or a list, depending on the value of <n_to_hub>.
+
+        """
+        if not self._multitask_loop_running:
+            raise AssertionError(
+                "Start 'process_calls' as a seperate task (coroutine) before using 'call_multitask()'"
+            )
+
+        result_holder = {"done": False, "result": None, "error": None}
+        self._queue.append((command_name, argv, wait_ms, result_holder))
+
+        while not result_holder["done"]:
+            await wait(1)  # cooperative multitasking
+
+        if result_holder["error"]:
+            raise result_holder["error"]
+        return result_holder["result"]
+
+    async def _execute_call(self, mode_name: str, *argv, wait_ms=0):
+        mode = self.modes[mode_name]
+        size = self.commands[mode][SIZE]
+
+        if FROM_HUB_FORMAT in self.commands[mode]:
+            num_args = self.commands[mode][ARGS_FROM_HUB]
+            if num_args >= 0:
+                assert (
+                    len(argv) == num_args
+                ), "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
+            payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
+            await self.pup_device.write(
+                mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
+            )
+            await wait(wait_ms)
+
+        data = await self.pup_device.read(mode)
+        size = len(data)
+        raw_data = struct.pack("%db" % size, *data)
+        result = self.decode(self.commands[mode][TO_HUB_FORMAT], raw_data)
+        # Convert tuple size 1 to single value
+        return result[0] if len(result) == 1 else result
+
+    async def process_calls(self):
+        """
+        Process multitask MicroPUP calls in a queue to avoid EAGAIN or IOERR.
+        """
+        self._multitask_loop_running = True
+        running = False
+        while True:
+            if self._queue and not running:
+                running = True
+                command_name, argv, wait_ms, result_holder = self._queue.pop(0)
+
+                try:
+                    result = await self._execute_call(
+                        command_name, *argv, wait_ms=wait_ms
+                    )
+                    result_holder["result"] = result
+                except Exception as e:
+                    result_holder["error"] = e
+                    print(e)
+                    raise
+                finally:
+                    result_holder["done"] = True
+                    running = False
+            await wait(1)
