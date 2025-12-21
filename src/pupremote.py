@@ -266,31 +266,51 @@ class PUPRemoteSensor(PUPRemote):
                 result = None
                 args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
                 result = await self.commands[mode][CALLABLE](*args)
-                num_args = self.commands[mode][ARGS_TO_HUB]
+                self._send_response(mode, result)
 
-                if result is None:
-                    assert num_args <= 0, "{}() did not return value(s)".format(
+    def _send_response(self, mode, result):
+        num_args = self.commands[mode][ARGS_TO_HUB]
+
+        if result is None:
+            assert num_args <= 0, "{}() did not return value(s)".format(
                         self.commands[mode][NAME]
                     )
-                else:
-                    if not isinstance(result, tuple):
-                        result = (result,)
-                    if num_args >= 0:
-                        assert num_args == len(
+        else:
+            if not isinstance(result, tuple):
+                result = (result,)
+            if num_args >= 0:
+                assert num_args == len(
                             result
                         ), "{}() returned {} value(s) instead of expected {}".format(
                             self.commands[mode][NAME], len(result), num_args
                         )
-                    pl = self.encode(
+            pl = self.encode(
                         self.commands[mode][SIZE],
                         self.commands[mode][TO_HUB_FORMAT],
                         *result,
                     )
-                    self.lpup.send_payload(pl, mode)
+            self.lpup.send_payload(pl, mode)
 
     async def process_async(self, interval_ms: int = 50):
-        """Start both heartbeat and callback processing tasks."""
-        # heartbeat at least 15 Hz (66ms)
+        """
+        Start both heartbeat and callback processing tasks concurrently.
+
+        This method creates and runs two asynchronous tasks in parallel:
+        - A heartbeat loop that maintains communication at a minimum frequency of 15 Hz
+        - A callback processing loop that handles queued callbacks
+
+        :param interval_ms: The interval in milliseconds between heartbeats. Must be maximum 
+                            66ms to maintain minimum 15 Hz frequency. Defaults to 50ms.
+        :type interval_ms: int
+        :return: None. Runs until both tasks complete or are cancelled.
+        :rtype: None
+        :raises asyncio.CancelledError: If either task is cancelled during execution.
+
+        .. note::
+           This is a long-running coroutine that should be the main entry point for 
+           asynchronous operation. It will run indefinitely until explicitly cancelled.
+        """
+        
         hb_task = asyncio.create_task(self._heartbeat_loop(interval_ms))
         cb_task = asyncio.create_task(self._process_callbacks())
         await asyncio.gather(hb_task, cb_task)
@@ -310,27 +330,7 @@ class PUPRemoteSensor(PUPRemote):
                 result = None
                 args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
                 result = self.commands[mode][CALLABLE](*args)
-                num_args = self.commands[mode][ARGS_TO_HUB]
-
-                if result is None:
-                    assert num_args <= 0, "{}() did not return value(s)".format(
-                        self.commands[mode][NAME]
-                    )
-                else:
-                    if not isinstance(result, tuple):
-                        result = (result,)
-                    if num_args >= 0:
-                        assert num_args == len(
-                            result
-                        ), "{}() returned {} value(s) instead of expected {}".format(
-                            self.commands[mode][NAME], len(result), num_args
-                        )
-                    pl = self.encode(
-                        self.commands[mode][SIZE],
-                        self.commands[mode][TO_HUB_FORMAT],
-                        *result,
-                    )
-                    self.lpup.send_payload(pl, mode)
+                self._send_response(mode, result)
         return self.lpup.connected
 
     def update_channel(self, mode_name: str, *argv):
@@ -519,8 +519,9 @@ if __name__ == "__main__":
         # Example sensor-side (lms-esp32) program using process_async
         # -------------------------------------------------
 
-        # This example reads a generic analog sensor every 200ms,
-        # updates a 'value' channel, and responds to a 'reset' RPC.
+        # This example simulates a sensor reading every 0.5 seconds,
+        # by incrementing a counter and calculating 1/counter. It
+        # updates a 'value' channel, and responds to a 'reset' call.
 
         counter = 1
 
@@ -560,6 +561,15 @@ if __name__ == "__main__":
         # -------------------------------------------------
         # Example hub-side program using process_async
         # -------------------------------------------------
+        
+        # This example reads a 'value' channel every 50ms,
+        # and calls a 'reset' call every 2 seconds to reset the counter 
+        # on the sensor side.
+        
+        # Race=True makes sure the program ends when one of the user tasks/loops is done.
+        # and process_calls() does not keep the program running forever.
+        
+        
         from pybricks.parameters import Port
         from pybricks.tools import multitask, run_task
 
@@ -577,12 +587,13 @@ if __name__ == "__main__":
         async def main2():
             # User program. Put anything you like in here.
             for i in range(10):
-                await wait(1000)
+                await wait(2000)
                 val = await pr.call_multitask("reset")
                 print(val)
 
         async def main():
-            # race=True ensures the program finishes when the first user thread is done.
+            # race=True ensures the program finishes when 
+            # the first user thread is done.
             await multitask(main1(), main2(), pr.process_calls(), race=True)
 
         run_task(main())

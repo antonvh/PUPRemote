@@ -120,6 +120,11 @@ while True:
 - `docs/` Sphinx docs with API references
 - `img/` project assets (logo)
 
+## Development Notes (MicroPython first)
+- Target runtime is MicroPython; verify every proposed import exists there (e.g., `inspect` is unavailable—avoid it).
+- Prefer `ustruct`, `uasyncio`, and `micropython.const`; gate CPython-only helpers behind `try/except ImportError`.
+- Keep memory and dependency footprint small; avoid modules that pull in large transitive imports.
+
 ## Contributing
 Contributions and protocol refinements are welcome. Please open an issue or PR with your ideas or projects built on PUPRemote.
 
