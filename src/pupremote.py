@@ -1,14 +1,20 @@
 __author__ = "Anton Vanhoucke & Ste7an"
 __copyright__ = "Copyright 2023,2024 AntonsMindstorms.com"
 __license__ = "GPL"
-__version__ = "1.6"
+__version__ = "2.1"
 __status__ = "Production"
 
 try:
     from pybricks.iodevices import PUPDevice
-    from pybricks.tools import wait
+    from pybricks.tools import wait, run_task
+    import ustruct as struct
+
+    side = "Hub"
 except ImportError:
-    # We surely aren't on pybricks.
+    # We surely aren't on pybricks. Probably on the sensor side (openmv or lms-esp32)
+    side = "Sensor"
+
+    # Avoid errors when using Pybricks classes and functions.
     class PUPDevice:
         def __init__(self, port):
             pass
@@ -22,36 +28,23 @@ except ImportError:
     def wait(ms):
         pass
 
-    # Pybricks has no time module, so here it's safe to import
-    try:
-        from time import ticks_ms
-    except:
-        from time import time as time_s
-
-        def ticks_ms():
-            return round(time_s() * 1000)
-
-    # Pybricks does not need the lpf2 module, so here we import it
+    # Import modules for sensor side only.
+    import asyncio
     import lpf2
-    from lpf2 import OPENMV, ESP32, OPENMVRT
-
-try:
-    import ustruct as struct
-except ImportError:
-    # If ustruct is not available...
     import struct
+    from collections import deque
 
 try:
     from micropython import const
 except ImportError:
-    # micropython.const() is not available on normal Python
-    # but we can use a normal function instead for unit tests
+    # Create quick polyfill on platforms that don't support it
     def const(x):
         return x
 
 
 MAX_PKT = const(16)
 MAX_COMMANDS = const(16)
+MAX_COMMAND_QUEUE_LENGTH = const(10)
 
 # Dictionary keys
 NAME = const(0)
@@ -136,17 +129,21 @@ class PUPRemote:
             size_to_hub_fmt = struct.calcsize(to_hub_fmt)
             size_from_hub_fmt = struct.calcsize(from_hub_fmt)
             msg_size = max(size_to_hub_fmt, size_from_hub_fmt)
-            num_args_to_hub = len(struct.unpack(to_hub_fmt,bytearray(struct.calcsize(to_hub_fmt))))
-            num_args_from_hub = len(struct.unpack(from_hub_fmt,bytearray(struct.calcsize(from_hub_fmt))))
+            num_args_to_hub = len(
+                struct.unpack(to_hub_fmt, bytearray(struct.calcsize(to_hub_fmt)))
+            )
+            num_args_from_hub = len(
+                struct.unpack(from_hub_fmt, bytearray(struct.calcsize(from_hub_fmt)))
+            )
 
-        assert len(self.commands) < MAX_COMMANDS, 'Command limit exceeded'
+        assert len(self.commands) < MAX_COMMANDS, "Command limit exceeded"
         assert msg_size <= self.max_packet_size, "Payload exceeds maximum packet size"
         self.commands.append(
             {
                 NAME: mode_name,
                 TO_HUB_FORMAT: to_hub_fmt,
                 SIZE: msg_size,
-                ARGS_TO_HUB: num_args_to_hub
+                ARGS_TO_HUB: num_args_to_hub,
             }
         )
         if command_type == CALLBACK:
@@ -167,16 +164,15 @@ class PUPRemote:
                 return ("",)
         else:
             size = struct.calcsize(fmt)
-            return struct.unpack(fmt, data[:size])
+            data = struct.unpack(fmt, data[:size])
+        return data
 
     def encode(self, size, format, *argv):
         if format == "repr":
             s = bytes(repr(*argv), "UTF-8")
         else:
             s = struct.pack(format, *argv)
-
         assert len(s) <= size, "Payload exceeds maximum packet size"
-
         return s
 
 
@@ -202,14 +198,16 @@ class PUPRemoteSensor(PUPRemote):
         sensor_id=SPIKE_ULTRASONIC,
         power=False,
         max_packet_size=MAX_PKT,
-        **kwargs  # backward compatibility
+        **kwargs,  # backward compatibility
     ):
         super().__init__(max_packet_size)
         self.connected = False
-        self.power = power
-        self.mode_names = []
+        self.power = power  ## ?
+        self.mode_names = []  ## ?
         self.max_packet_size = max_packet_size
         self.lpup = lpf2.LPF2([], sensor_id=sensor_id, max_packet_size=max_packet_size)
+        self._callback_queue = deque((), MAX_COMMAND_QUEUE_LENGTH)
+        self._callback_lock = asyncio.Lock()
 
     def add_command(
         self,
@@ -225,7 +223,9 @@ class PUPRemoteSensor(PUPRemote):
         if from_hub_fmt != "":
             writeable = lpf2.ABSOLUTE
         max_mode_name_len = 5 if self.power else 11
-        assert len(mode_name) <= max_mode_name_len, "Name length must be <= {} with power={}".format(
+        assert (
+            len(mode_name) <= max_mode_name_len
+        ), "Name length must be <= {} with power={}".format(
             max_mode_name_len, self.power
         )
         if self.power:
@@ -237,13 +237,63 @@ class PUPRemoteSensor(PUPRemote):
         self.lpup.modes.append(
             self.lpup.mode(
                 mode_name,
-                self.commands[-1][
-                    SIZE
-                ],  # This packet size of the last command we added (this one)
+                self.commands[-1][SIZE],  # Size of the last command we added.
                 lpf2.DATA8,
                 writeable,
             )
         )
+
+    async def _heartbeat_loop(self, interval_ms: int):
+        """Continuously call heartbeat at fixed interval and enqueue callbacks"""
+        while True:
+            data = self.lpup.heartbeat()
+            if data:
+                async with self._callback_lock:
+                    self._callback_queue.append(data)
+            await asyncio.sleep(interval_ms / 1000)
+
+    async def _process_callbacks(self):
+        """Process incoming callbacks from queue serially"""
+        while True:
+            await asyncio.sleep(0)  # Yield to allow _heartbeat_loop to enqueue
+            async with self._callback_lock:
+                if self._callback_queue:
+                    pl, mode = self._callback_queue.popleft()
+                else:
+                    continue
+
+            if CALLABLE in self.commands[mode]:
+                result = None
+                args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
+                result = await self.commands[mode][CALLABLE](*args)
+                num_args = self.commands[mode][ARGS_TO_HUB]
+
+                if result is None:
+                    assert num_args <= 0, "{}() did not return value(s)".format(
+                        self.commands[mode][NAME]
+                    )
+                else:
+                    if not isinstance(result, tuple):
+                        result = (result,)
+                    if num_args >= 0:
+                        assert num_args == len(
+                            result
+                        ), "{}() returned {} value(s) instead of expected {}".format(
+                            self.commands[mode][NAME], len(result), num_args
+                        )
+                    pl = self.encode(
+                        self.commands[mode][SIZE],
+                        self.commands[mode][TO_HUB_FORMAT],
+                        *result,
+                    )
+                    self.lpup.send_payload(pl, mode)
+
+    async def process_async(self, interval_ms: int = 50):
+        """Start both heartbeat and callback processing tasks."""
+        # heartbeat at least 15 Hz (66ms)
+        hb_task = asyncio.create_task(self._heartbeat_loop(interval_ms))
+        cb_task = asyncio.create_task(self._process_callbacks())
+        await asyncio.gather(hb_task, cb_task)
 
     def process(self):
         """
@@ -253,13 +303,9 @@ class PUPRemoteSensor(PUPRemote):
 
         :return: True if connected to the hub, False otherwise.
         """
-        # Get data from the hub and return previously stored payloads
         data = self.lpup.heartbeat()
-
-        # Send data to the hub, by calling a function
         if data is not None:
             pl, mode = data
-
             if CALLABLE in self.commands[mode]:
                 result = None
                 args = self.decode(self.commands[mode][FROM_HUB_FORMAT], pl)
@@ -267,24 +313,24 @@ class PUPRemoteSensor(PUPRemote):
                 num_args = self.commands[mode][ARGS_TO_HUB]
 
                 if result is None:
-                    assert num_args <= 0, "{}() did not return value(s)".format(self.commands[mode][NAME])
+                    assert num_args <= 0, "{}() did not return value(s)".format(
+                        self.commands[mode][NAME]
+                    )
                 else:
                     if not isinstance(result, tuple):
                         result = (result,)
                     if num_args >= 0:
-                        assert num_args == len(result), \
-                            "{}() returned {} value(s) instead of expected {}".format(
-                                self.commands[mode][NAME],
-                                len(result),
-                                num_args
-                                )
+                        assert num_args == len(
+                            result
+                        ), "{}() returned {} value(s) instead of expected {}".format(
+                            self.commands[mode][NAME], len(result), num_args
+                        )
                     pl = self.encode(
                         self.commands[mode][SIZE],
                         self.commands[mode][TO_HUB_FORMAT],
-                        *result
+                        *result,
                     )
                     self.lpup.send_payload(pl, mode)
-
         return self.lpup.connected
 
     def update_channel(self, mode_name: str, *argv):
@@ -300,6 +346,11 @@ class PUPRemoteSensor(PUPRemote):
             self.commands[mode][SIZE], self.commands[mode][TO_HUB_FORMAT], *argv
         )
         self.lpup.update_payload(pl, mode)
+
+    async def update_channel_async(self, mode_name: str, *args):
+        await asyncio.get_running_loop().run_in_executor(
+            None, self.update_channel, mode_name, *args
+        )
 
 
 class PUPRemoteHub(PUPRemote):
@@ -326,17 +377,24 @@ class PUPRemoteHub(PUPRemote):
             self.pup_device = None
             print("Check wiring and remote script. Unable to connect on ", self.port)
             raise
+        # Multitask stuff
+        self._queue = []
+        self._multitask_loop_running = False
 
-    def add_command(self, mode_name, to_hub_fmt = "", from_hub_fmt = "", command_type=CALLBACK):
+    def add_command(
+        self, mode_name, to_hub_fmt="", from_hub_fmt="", command_type=CALLBACK
+    ):
         super().add_command(mode_name, to_hub_fmt, from_hub_fmt, command_type)
         # Check the newly added commands against the advertised modes.
-        modes = self.pup_device.info()['modes']
-        n = len(self.commands)-1 # Zero indexed mode number
+        modes = self.pup_device.info()["modes"]
+        n = len(self.commands) - 1  # Zero indexed mode number
         assert len(self.commands) <= len(modes), "More commands than on remote side"
-        assert mode_name == modes[n][0].rstrip(), \
-            f"Expected '{modes[n][0].rstrip()}' as mode {n}, but got '{mode_name}'"
-        assert self.commands[-1][SIZE] == modes[n][1], \
-            f"Different parameter size than on remote side. Check formats."
+        assert (
+            mode_name == modes[n][0].rstrip()
+        ), f"Expected '{modes[n][0].rstrip()}' as mode {n}, but got '{mode_name}'"
+        assert (
+            self.commands[-1][SIZE] == modes[n][1]
+        ), f"Different parameter size than on remote side. Check formats."
 
     def call(self, mode_name: str, *argv, wait_ms=0):
         """
@@ -348,19 +406,23 @@ class PUPRemoteHub(PUPRemote):
         :type argv: Any
         :param wait_ms: The time to wait before reading after sending the call payload.
             Only applicable if there is a payload outbound from the hub. So not for channels or
-            functions without parameters. 
+            functions without parameters.
             Defaults to 0ms. A good value is `struct.calcsize(from_hub_fmt) * 1.5` (ms)
         :type wait_ms: int
         """
+        assert (
+            not run_task()
+        ), "Use 'call_multitask' instead of 'call', with multiple start blocks or multitask blocks"
 
         mode = self.modes[mode_name]
         size = self.commands[mode][SIZE]
-        
+
         if FROM_HUB_FORMAT in self.commands[mode]:
             num_args = self.commands[mode][ARGS_FROM_HUB]
             if num_args >= 0:
-                assert len(argv) == num_args, \
-                "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
+                assert (
+                    len(argv) == num_args
+                ), "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
             self.pup_device.write(
                 mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
@@ -372,7 +434,155 @@ class PUPRemoteHub(PUPRemote):
         raw_data = struct.pack("%db" % size, *data)
         result = self.decode(self.commands[mode][TO_HUB_FORMAT], raw_data)
         # Convert tuple size 1 to single value
-        if len(result) == 1:
-            return result[0]
-        else:
-            return result
+        return result[0] if len(result) == 1 else result
+
+    async def call_multitask(self, command_name: str, *argv, wait_ms=0):
+        """
+        Calls a remote function.
+        This is the async version for use with Pybricks Multitask.
+        Make sure to run 'process_calls()' as coroutine.
+
+        :param command_name: The name of the command
+        :type command_name: string
+        :param Optionally, you can pass the <n_from_hub> number of parameters.
+
+        :return: It will return a single value, or a list, depending on the value of <n_to_hub>.
+
+        """
+        if not self._multitask_loop_running:
+            raise AssertionError(
+                "Start 'process_calls' as a seperate task (coroutine) before using 'call_multitask()'"
+            )
+
+        result_holder = {"done": False, "result": None, "error": None}
+        self._queue.append((command_name, argv, wait_ms, result_holder))
+
+        while not result_holder["done"]:
+            await wait(1)  # cooperative multitasking
+
+        if result_holder["error"]:
+            raise result_holder["error"]
+        return result_holder["result"]
+
+    async def _execute_call(self, mode_name: str, *argv, wait_ms=0):
+        mode = self.modes[mode_name]
+        size = self.commands[mode][SIZE]
+
+        if FROM_HUB_FORMAT in self.commands[mode]:
+            num_args = self.commands[mode][ARGS_FROM_HUB]
+            if num_args >= 0:
+                assert (
+                    len(argv) == num_args
+                ), "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
+            payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
+            await self.pup_device.write(
+                mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
+            )
+            await wait(wait_ms)
+
+        data = await self.pup_device.read(mode)
+        size = len(data)
+        raw_data = struct.pack("%db" % size, *data)
+        result = self.decode(self.commands[mode][TO_HUB_FORMAT], raw_data)
+        # Convert tuple size 1 to single value
+        return result[0] if len(result) == 1 else result
+
+    async def process_calls(self):
+        """
+        Process multitask MicroPUP calls in a queue to avoid EAGAIN or IOERR.
+        """
+        self._multitask_loop_running = True
+        running = False
+        while True:
+            if self._queue and not running:
+                running = True
+                command_name, argv, wait_ms, result_holder = self._queue.pop(0)
+
+                try:
+                    result = await self._execute_call(
+                        command_name, *argv, wait_ms=wait_ms
+                    )
+                    result_holder["result"] = result
+                except Exception as e:
+                    result_holder["error"] = e
+                    print(e)
+                    raise
+                finally:
+                    result_holder["done"] = True
+                    running = False
+            await wait(1)
+
+
+if __name__ == "__main__":
+    if side == "Sensor":
+        # -------------------------------------------------
+        # Example sensor-side (lms-esp32) program using process_async
+        # -------------------------------------------------
+
+        # This example reads a generic analog sensor every 200ms,
+        # updates a 'value' channel, and responds to a 'reset' RPC.
+
+        counter = 1
+
+        async def reset():
+            # Remote commands also need to be async!!
+            global counter
+            counter = 1
+            print("Reset")
+            await asyncio.sleep(1)
+            return 1  # acknowledgement
+
+        async def main():
+            global counter
+            pr = PUPRemoteSensor()
+
+            # RPC: reset counter on hub request
+            pr.add_command("reset", to_hub_fmt="repr")
+            pr.add_channel("value", to_hub_fmt="f")
+
+            # Start heartbeat/callback processing
+            asyncio.create_task(pr.process_async())
+
+            # User loop: read analog input and update channel
+            while True:
+                val = 1 / counter  # replace with actual sensor read
+                pr.update_channel("value", float(val))
+                counter += 1
+                # Yes: the main loop can be slow without hindering the heartbeat!
+                await asyncio.sleep(0.5)
+
+        try:
+            asyncio.run(main())
+        finally:
+            asyncio.new_event_loop()
+
+    elif side == "Hub":
+        # -------------------------------------------------
+        # Example hub-side program using process_async
+        # -------------------------------------------------
+        from pybricks.parameters import Port
+        from pybricks.tools import multitask, run_task
+
+        pr = PUPRemoteHub(Port.A)
+        pr.add_command("reset", to_hub_fmt="repr")
+        pr.add_channel("value", to_hub_fmt="f")
+
+        async def main1():
+            # User program. Put anything you like in here.
+            while True:
+                await wait(50)
+                val = await pr.call_multitask("value")
+                print(val)
+
+        async def main2():
+            # User program. Put anything you like in here.
+            for i in range(10):
+                await wait(1000)
+                val = await pr.call_multitask("reset")
+                print(val)
+
+        async def main():
+            # race=True ensures the program finishes when the first user thread is done.
+            await multitask(main1(), main2(), pr.process_calls(), race=True)
+
+        run_task(main())
