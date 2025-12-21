@@ -2,16 +2,14 @@
 # Includes async/multitask support for concurrent hub-side operations
 #
 # This is a lightweight version (44% smaller than pupremote.py) optimized for:
+# - Pybricks block code: 
+#      - import sync functions connect(), add_command(), call()
+#      - import async functions call_multitask(), process_calls()
+# - Pybricks multitask support for concurrent operations
 # - Low memory footprint on Pybricks hubs
 # - Hub-side only (no sensor emulation code)
 # - Async support via call_multitask() and process_calls()
 # - Compatible with Pybricks multitask for concurrent operations
-#
-# Removed from full pupremote.py:
-# - PUPRemoteSensor class
-# - asyncio, lpf2, deque imports
-# - Sensor-side methods (_heartbeat_loop, _process_callbacks, etc.)
-# - Example code
 
 __author__ = "Anton Vanhoucke & Ste7an"
 __copyright__ = "Copyright 2023,2024 AntonsMindstorms.com"
@@ -25,24 +23,14 @@ from pybricks.tools import wait, run_task
 from micropython import const
 
 MAX_PKT = const(16)
-MAX_COMMANDS = const(16)
 
 # Dictionary keys
 NAME = const(0)
 SIZE = const(1)
 TO_HUB_FORMAT = const(2)
 FROM_HUB_FORMAT = const(3)
-CALLABLE = const(4)
 ARGS_TO_HUB = const(5)
 ARGS_FROM_HUB = const(6)
-
-#: WeDo Ultrasonic sensor id
-WEDO_ULTRASONIC = const(35)
-#: SPIKE Color sensor id
-SPIKE_COLOR = const(61)
-#: SPIKE Ultrasonic sensor id
-SPIKE_ULTRASONIC = const(62)
-
 CALLBACK = const(0)
 CHANNEL = const(1)
 
@@ -82,6 +70,19 @@ def add_command(name, to_hub, from_hub):
         print("Use the connect command before adding a command")
         raise
 
+def call_multitask(*args, **kwargs):
+    try:
+        return pr.call_multitask(*args, **kwargs)
+    except:
+        print("Use the connect & add_channel or add_command blocks before call_multitask")
+        raise
+    
+def process_calls():
+    try:
+        return pr.process_calls()
+    except:
+        print("Use the connect command before starting process_calls")
+        raise
 
 class PUPRemote:
     def __init__(self, max_packet_size=MAX_PKT):
@@ -141,7 +142,6 @@ class PUPRemote:
                 struct.unpack(from_hub_fmt, bytearray(struct.calcsize(from_hub_fmt)))
             )
 
-        assert len(self.commands) < MAX_COMMANDS, "Command limit exceeded"
         assert msg_size <= self.max_packet_size, "Payload exceeds maximum packet size"
         self.commands.append(
             {
@@ -160,13 +160,8 @@ class PUPRemote:
 
     def decode(self, fmt: str, data: bytes):
         if fmt == "repr":
-            # Remove trailing zero's (b'\x00') and eval the string
-            clean = bytearray([c for c in data if c != 0])
-            if clean:
-                return (eval(clean),)
-            else:
-                # Probably nothing left after stripping zero's
-                return ("",)
+            clean = data.rstrip(b'\x00')
+            return (eval(clean),) if clean else ("",)
         else:
             size = struct.calcsize(fmt)
             data = struct.unpack(fmt, data[:size])
@@ -253,7 +248,7 @@ class PUPRemoteHub(PUPRemote):
                 ), "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
             self.pup_device.write(
-                mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
+                mode, [((i + 128) & 0xFF) - 128 for i in tuple(payl + b"\x00" * (size - len(payl)))]
             )
             wait(wait_ms)
 
@@ -299,12 +294,10 @@ class PUPRemoteHub(PUPRemote):
         if FROM_HUB_FORMAT in self.commands[mode]:
             num_args = self.commands[mode][ARGS_FROM_HUB]
             if num_args >= 0:
-                assert (
-                    len(argv) == num_args
-                ), "Expected {} argument(s) in call '{}'".format(num_args, mode_name)
+                assert len(argv) == num_args, "Args mismatch in {}".format(mode_name)
             payl = self.encode(size, self.commands[mode][FROM_HUB_FORMAT], *argv)
             await self.pup_device.write(
-                mode, self._int8_to_uint8(tuple(payl + b"\x00" * (size - len(payl))))
+                mode, [((i + 128) & 0xFF) - 128 for i in tuple(payl + b"\x00" * (size - len(payl)))]
             )
             await wait(wait_ms)
 
