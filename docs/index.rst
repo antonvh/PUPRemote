@@ -32,11 +32,13 @@ Async LMS-ESP32 & Pybricks Example
 ----------------------------------
 
 Run this on LMS-ESP32 firmware (the board already includes `pupremote.py` and `lpf2.py`; just place this as `main.py`).
+
 .. literalinclude:: ../examples/esp32_async/pup_demo_esp32_async.py
     :language: python
 
 Run this on Pybricks. Be sure to create a file called `pupremote_hub.py` with
 the contents of `pupremote_hub.py`
+
 .. literalinclude:: ../examples/esp32_async/pup_demo_pybricks_async.py
     :language: python
 
