@@ -323,7 +323,8 @@ class PUPRemoteSensor(PUPRemote):
         return self.lpup.connected
 
     def update_channel(self, mode_name: str, *argv):
-        """Update values in sensor memory for hub retrieval.
+        """Update values in sensor memory for hub retrieval. This method has no
+        async version, as it only updates local memory. It is non blocking.
 
         Simpler alternative to defining a function called from the hub.
 
@@ -337,12 +338,6 @@ class PUPRemoteSensor(PUPRemote):
             self.commands[mode][SIZE], self.commands[mode][TO_HUB_FORMAT], *argv
         )
         self.lpup.update_payload(pl, mode)
-
-    async def update_channel_async(self, mode_name: str, *args):
-        await asyncio.get_running_loop().run_in_executor(
-            None, self.update_channel, mode_name, *args
-        )
-
 
 class PUPRemoteHub(PUPRemote):
     """Communicate with a PUPRemoteSensor from a Pybricks hub.
