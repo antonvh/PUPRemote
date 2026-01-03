@@ -339,6 +339,7 @@ class PUPRemoteSensor(PUPRemote):
         )
         self.lpup.update_payload(pl, mode)
 
+
 class PUPRemoteHub(PUPRemote):
     """Communicate with a PUPRemoteSensor from a Pybricks hub.
 
@@ -376,10 +377,12 @@ class PUPRemoteHub(PUPRemote):
         assert len(self.commands) <= len(modes), "More commands than on remote side"
         assert (
             mode_name == modes[n][0].rstrip()
-        ), f"Expected '{modes[n][0].rstrip()}' as mode {n}, but got '{mode_name}'"
+        ), "Expected '{}' as mode {}, but got '{}'".format(
+            modes[n][0].rstrip(), n, mode_name
+        )
         assert (
             self.commands[-1][SIZE] == modes[n][1]
-        ), f"Different parameter size than on remote side. Check formats."
+        ), "Different parameter size than on remote side. Check formats."
 
     def call(self, mode_name: str, *argv, wait_ms=0):
         """Call a remote function on the sensor side.
