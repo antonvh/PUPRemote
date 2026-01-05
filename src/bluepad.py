@@ -7,7 +7,7 @@ __status__ = "Production"
 # !! Upload this file into your editor at code.pybricks.com
 
 from pybricks.iodevices import PUPDevice
-import struct
+import ustruct
 
 
 FILL = 0x10
