@@ -275,8 +275,7 @@ class PUPRemoteHub(PUPRemote):
             wait(wait_ms)
 
         data = self.pup_device.read(mode)
-        size = len(data)
-        raw_data = struct.pack("%db" % size, *data)
+        raw_data = bytes([b if b>=0 else b+256 for b in data])
         result = self.decode(self.commands[mode][TO_HUB_FORMAT], raw_data)
         # Convert tuple size 1 to single value
         return result[0] if len(result) == 1 else result
@@ -328,8 +327,7 @@ class PUPRemoteHub(PUPRemote):
             await wait(wait_ms)
 
         data = await self.pup_device.read(mode)
-        size = len(data)
-        raw_data = struct.pack("%db" % size, *data)
+        raw_data = bytes([b if b>=0 else b+256 for b in data])
         result = self.decode(self.commands[mode][TO_HUB_FORMAT], raw_data)
         # Convert tuple size 1 to single value
         return result[0] if len(result) == 1 else result
