@@ -445,6 +445,7 @@ class LPF2(object):
                     if ck == self.readchar(1):
                         return buf, wrt_mode
                     else:
+                        self.flush()
                         print(
                             "Checksum error. Try reducing max_packet_size to 16 if using Pybricks."
                         )
