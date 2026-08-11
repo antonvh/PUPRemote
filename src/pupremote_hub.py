@@ -64,7 +64,7 @@ def add_channel(name, encoding):
         raise
 
 
-def add_command(name, to_hub, from_hub):
+def add_command(name, to_hub="", from_hub=""):
     try:
         pr.add_command(name, to_hub_fmt=to_hub, from_hub_fmt=from_hub)
     except:
