@@ -45,11 +45,7 @@ def connect(port):
     Connect to LMS-ESP32. Pass Port as a string ('A') or a number (1=Port.A)
     """
     global pr
-    if isinstance(port, str):
-        pyport = eval("Port." + port)
-    if isinstance(port, int):
-        pyport = eval("Port." + chr(64 + port))
-    pr = PUPRemoteHub(pyport)
+    pr = PUPRemoteHub(port)
 
 
 def call(*args):
@@ -208,7 +204,12 @@ class PUPRemoteHub(PUPRemote):
 
     def __init__(self, port, max_packet_size=MAX_PKT):
         super().__init__(max_packet_size)
-        self.port = port
+        if isinstance(port, str):
+            port = eval("Port." + port)
+        if isinstance(port, int):
+            port = eval("Port." + chr(64 + port))
+        else: 
+            self.port = port
         try:
             self.pup_device = PUPDevice(port)
         except OSError:
