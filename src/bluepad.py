@@ -36,8 +36,14 @@ class BluePad:
         self.nr_leds = 24
         self.arr_servos = [0] * 8
 
+    def switch_mode(self, new_mode):
+        if new_mode != self.cur_mode:
+            # extra read, just in case a write is performed
+            self.pup.read(new_mode)
+        self.cur_mode = new_mode
+
     def send(self, byte_vals):
-        self.cur_mode = 0
+        self.switch_mode(0)
         if self.sensor_id == 64:
             signed_vals = ustruct.unpack("9b", ustruct.pack("9B", *byte_vals))
             self.pup.write(self.cur_mode, signed_vals)
@@ -129,7 +135,7 @@ class BluePad:
         leds[1] = nr_leds
         leds[2] = pin
         r = self.send(leds)
-        self.cur_mode = 0
+        self.switch_mode(0)
         self.nr_leds = nr_leds
         return r
 
@@ -147,7 +153,7 @@ class BluePad:
         leds[0] = FILL | WRITE if write else FILL
         leds[1:4] = [r, g, b]
         r = self.send(leds)
-        self.cur_mode = 0
+        self.switch_mode(0)
         return r
 
     def neopixel_zero(self, write=True):
@@ -160,7 +166,7 @@ class BluePad:
         leds = [0] * 16
         leds[0] = ZERO | WRITE if write else FILL
         r = self.send(leds)
-        self.cur_mode = 0
+        self.switch_mode(0)
         return r
 
     def neopixel_set(self, led_nr, color, write=True):
@@ -185,7 +191,7 @@ class BluePad:
         else:
             leds[3:6] = [r, g, b]
             r = self.send(leds)
-        self.cur_mode = 0
+        self.switch_mode(0)
         return r
 
     def neopixel_set_multi(self, start_led, nr_led, led_arr, write=True):
@@ -216,7 +222,7 @@ class BluePad:
                     "error neopixel_set_multi: led_nr does not correspons with led_arr"
                 )
                 r = None
-        self.cur_mode = 0
+        self.switch_mode(0)
         return r
 
     def servo(self, servo_nr, pos, zero_is_mid=True):
@@ -233,9 +239,7 @@ class BluePad:
         """
         offset = 90 if zero_is_mid else 0
         self.arr_servos[servo_nr] = (pos + offset) % 181
-        if self.cur_mode != 1:
-            self.cur_mode = 1
-            self.pup.read(1)
+        self.switch_mode(1)
         if self.sensor_id == 64:  # color matrix
             byte_vals = ustruct.unpack(
                 "9b", ustruct.pack("4HB", *self.arr_servos[:4], 0)
@@ -254,9 +258,7 @@ class BluePad:
         offset = 90 if zero_is_mid else 0
         for i in range(len(servo_tgts)):
             self.arr_servos[i] = (servo_tgts[i] + offset) % 181
-        if self.cur_mode != 1:
-            self.cur_mode = 1
-            self.pup.read(1)
+        self.switch_mode(1)
         if self.sensor_id == 64:  # color matrix
             byte_vals = ustruct.unpack(
                 "9b", ustruct.pack("4HB", *self.arr_servos[:4], 0)
