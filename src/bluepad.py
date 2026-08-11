@@ -233,7 +233,9 @@ class BluePad:
         """
         offset = 90 if zero_is_mid else 0
         self.arr_servos[servo_nr] = (pos + offset) % 181
-        self.cur_mode = 1
+        if self.cur_mode != 1:
+            self.cur_mode = 1
+            self.pup.read(1)
         if self.sensor_id == 64:  # color matrix
             byte_vals = ustruct.unpack(
                 "9b", ustruct.pack("4HB", *self.arr_servos[:4], 0)
@@ -252,7 +254,9 @@ class BluePad:
         offset = 90 if zero_is_mid else 0
         for i in range(len(servo_tgts)):
             self.arr_servos[i] = (servo_tgts[i] + offset) % 181
-        self.cur_mode = 1
+        if self.cur_mode != 1:
+            self.cur_mode = 1
+            self.pup.read(1)
         if self.sensor_id == 64:  # color matrix
             byte_vals = ustruct.unpack(
                 "9b", ustruct.pack("4HB", *self.arr_servos[:4], 0)
